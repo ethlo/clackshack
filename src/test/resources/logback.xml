@@ -8,15 +8,7 @@
         </encoder>
     </appender>
 
-    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
-        <resetJUL>true</resetJUL>
-    </contextListener>
-
-    <logger name="jdk.internal.httpclient.debug" level="trace" additivity="false">
-        <appender-ref ref="stdout"/>
-    </logger>
-
-    <root level="debug">
+    <root level="info">
         <appender-ref ref="stdout"/>
     </root>
 </configuration>

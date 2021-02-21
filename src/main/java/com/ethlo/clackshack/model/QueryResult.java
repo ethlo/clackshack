@@ -4,7 +4,7 @@ import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 
-import com.ethlo.clackshack.Java11Client;
+import com.ethlo.clackshack.JettyClient;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -54,7 +54,7 @@ public class QueryResult
     {
         try
         {
-            return Java11Client.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+            return JettyClient.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(this);
         }
         catch (JsonProcessingException e)
         {

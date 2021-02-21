@@ -1,5 +1,7 @@
 package com.ethlo.clackshack;
 
+import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
+
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -9,28 +11,49 @@ import java.net.Socket;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
 
-import com.ethlo.clackshack.model.ProgressListener;
+import com.ethlo.clackshack.model.QueryProgress;
 
 public class ClientTest
 {
     private static final Logger logger = LoggerFactory.getLogger(ClientTest.class);
-
-    static
+    
+    @Test
+    public void testAgainstClickHouse()
     {
-        SLF4JBridgeHandler.removeHandlersForRootLogger();
-        SLF4JBridgeHandler.install();
+        final List<QueryProgress> progressList = new LinkedList<>();
+        final Client client = new JettyClient("http://localhost:8123");
+        final String query = "SELECT count() as count FROM numbers(2000000000)";
+        client.query(query, progressList::add, System.err::println);
+
+        sleep(10_000);
+        client.close();
+
+        assertThat(progressList).isNotEmpty();
     }
 
-    @org.junit.Before
-    public void setup() throws IOException, URISyntaxException
+    private void sleep(int ms)
+    {
+        try
+        {
+            Thread.sleep(ms);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @org.junit.Ignore
+    @Test
+    public void testAgainstMockServer() throws URISyntaxException, IOException
     {
         // Load content
         final List<String> lines = Files.lines(Paths.get(ClassLoader.getSystemResource("http-response.txt")
@@ -41,7 +64,7 @@ public class ClientTest
             try
             {
                 final int port = 19999;
-                final int delayMs = 500;
+                final int delayMs = 100;
                 final ServerSocket serverSocket = new ServerSocket(port);
                 final Socket socket = serverSocket.accept();
                 logger.info("Socket open");
@@ -53,14 +76,7 @@ public class ClientTest
                         w.print(line);
                         w.print("\n");
                         w.flush();
-                        try
-                        {
-                            Thread.sleep(delayMs);
-                        }
-                        catch (InterruptedException e)
-                        {
-                            Thread.currentThread().interrupt();
-                        }
+                        sleep(delayMs);
                     }
                 }
             }
@@ -69,21 +85,10 @@ public class ClientTest
                 throw new UncheckedIOException(exc);
             }
         }).start();
-    }
 
-    @Test
-    @org.junit.Ignore
-    public void testAgainstClickHouse()
-    {
-        final Client client = new Java11Client("http://localhost:8123");
-        final String query = "SELECT count() FROM numbers(30000000000)";
-        client.query(query, ProgressListener.LOGGER, System.err::println);
-    }
+        final Client client = new JettyClient("http://localhost:19999");
+        client.query("", QueryProgressListener.LOGGER, System.err::println);
 
-    @Test
-    public void testAgainstMockServer()
-    {
-        final Client client = new Java11Client("http://localhost:19999");
-        client.query("", ProgressListener.LOGGER, System.err::println);
+        sleep(20_000);
     }
 }
