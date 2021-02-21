@@ -1,14 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="true" scan="true" scanInterval="10">
 
-    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
-        <resetJUL>true</resetJUL>
-    </contextListener>
-
-    <logger name="jdk.internal.httpclient.debug" level="debug" additivity="false">
-        <appender-ref ref="STDOUT"/>
-    </logger>
-
     <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d %5p [%t] [%c:%L] - %m%n%ex
@@ -16,7 +8,15 @@
         </encoder>
     </appender>
 
-    <root level="DEBUG">
-        <appender-ref ref="STDOUT"/>
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+        <resetJUL>true</resetJUL>
+    </contextListener>
+
+    <logger name="jdk.internal.httpclient.debug" level="trace" additivity="false">
+        <appender-ref ref="stdout"/>
+    </logger>
+
+    <root level="debug">
+        <appender-ref ref="stdout"/>
     </root>
 </configuration>

@@ -1,4 +1,4 @@
-package com.ethlo.clackshack;
+package com.ethlo.clackshack.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
