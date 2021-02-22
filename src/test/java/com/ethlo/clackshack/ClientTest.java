@@ -47,7 +47,7 @@ public class ClientTest
     {
         try (final Client client = new JettyClient(baseUrl))
         {
-            final String query = "SELECT id, created, code, result FROM data " +
+            final String query = "SELECT id, created, code, result FROM validations " +
                     "where id > :id " +
                     "and code <> :code " +
                     "and created < :max_created " +
@@ -65,7 +65,7 @@ public class ClientTest
             {
                 logger.info("\n{}", result);
 
-                final Object created = result.getQueryData().get(0).get("created");
+                final Object created = result.asTypedMap().get(0).get("created");
                 assertThat(created).isNotNull();
             }).get();
         }
