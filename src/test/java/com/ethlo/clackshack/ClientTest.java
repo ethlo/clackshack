@@ -1,94 +1,58 @@
 package com.ethlo.clackshack;
 
-import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.UncheckedIOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.concurrent.ExecutionException;
 
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryProgress;
 
 public class ClientTest
 {
     private static final Logger logger = LoggerFactory.getLogger(ClientTest.class);
-    
+
+    private static final String baseUrl = "http://localhost:8123";
+
     @Test
-    public void testAgainstClickHouse()
+    public void testQueryClickHouse() throws ExecutionException, InterruptedException
+    {
+        try (final Client client = new JettyClient(baseUrl))
+        {
+            final String query = "SELECT id, created, code, result FROM validations " +
+                    "where id > :foo " +
+                    "and code <> :code " +
+                    "and created < :max_created " +
+                    "and result = :result " +
+                    "order by created desc limit :max";
+            final List<QueryParam> params = Arrays.asList(
+                    QueryParam.of("foo", 0L),
+                    QueryParam.of("max", 10),
+                    QueryParam.of("code", "abcdefasdadasd"),
+                    QueryParam.of("max_created", LocalDateTime.now()),
+                    QueryParam.of("result", "y")
+            );
+            client.query(query, params, progress -> true).thenAccept(result -> logger.info("\n{}", result)).get();
+        }
+    }
+
+    @Test
+    public void testQueryProgressClickHouse() throws ExecutionException, InterruptedException
     {
         final List<QueryProgress> progressList = new LinkedList<>();
-        final Client client = new JettyClient("http://localhost:8123");
-        final String query = "SELECT count() as count FROM numbers(2000000000)";
-        client.query(query, progressList::add, System.err::println);
-
-        sleep(10_000);
-        client.close();
+        try (final Client client = new JettyClient(baseUrl))
+        {
+            final String query = "SELECT count() from numbers(10000000000)";
+            client.query(query, progressList::add).thenAccept(result -> logger.info("\n{}", result)).get();
+        }
 
         assertThat(progressList).isNotEmpty();
-    }
-
-    private void sleep(int ms)
-    {
-        try
-        {
-            Thread.sleep(ms);
-        }
-        catch (InterruptedException e)
-        {
-            e.printStackTrace();
-        }
-    }
-
-    @org.junit.Ignore
-    @Test
-    public void testAgainstMockServer() throws URISyntaxException, IOException
-    {
-        // Load content
-        final List<String> lines = Files.lines(Paths.get(ClassLoader.getSystemResource("http-response.txt")
-                .toURI())).collect(Collectors.toList());
-
-        new Thread(() ->
-        {
-            try
-            {
-                final int port = 19999;
-                final int delayMs = 100;
-                final ServerSocket serverSocket = new ServerSocket(port);
-                final Socket socket = serverSocket.accept();
-                logger.info("Socket open");
-                try (final PrintWriter w = new PrintWriter(new OutputStreamWriter(socket.getOutputStream())))
-                {
-                    for (final String line : lines)
-                    {
-                        logger.info("Server sending: {}", line);
-                        w.print(line);
-                        w.print("\n");
-                        w.flush();
-                        sleep(delayMs);
-                    }
-                }
-            }
-            catch (IOException exc)
-            {
-                throw new UncheckedIOException(exc);
-            }
-        }).start();
-
-        final Client client = new JettyClient("http://localhost:19999");
-        client.query("", QueryProgressListener.LOGGER, System.err::println);
-
-        sleep(20_000);
     }
 }

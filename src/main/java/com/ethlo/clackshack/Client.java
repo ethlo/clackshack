@@ -1,24 +1,25 @@
 package com.ethlo.clackshack;
 
 import java.util.Collections;
-import java.util.Map;
-import java.util.function.Consumer;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryResult;
 
-public interface Client
+public interface Client extends AutoCloseable
 {
-    default void query(final String query, final Consumer<QueryResult> resultListener)
+    default CompletableFuture<QueryResult> query(final String query)
     {
-        query(query, Collections.emptyMap(), QueryProgressListener.NOP, resultListener);
+        return query(query, Collections.emptyList(), QueryProgressListener.NOP);
     }
 
-    default void query(final String query, final QueryProgressListener queryProgressListener, final Consumer<QueryResult> resultListener)
+    default CompletableFuture<QueryResult> query(final String query, final QueryProgressListener queryProgressListener)
     {
-        query(query, Collections.emptyMap(), queryProgressListener, resultListener);
+        return query(query, Collections.emptyList(), queryProgressListener);
     }
 
-    void query(final String query, final Map<String, String> params, final QueryProgressListener queryProgressListener, final Consumer<QueryResult> callback);
+    CompletableFuture<QueryResult> query(final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener);
 
     void close();
 }
