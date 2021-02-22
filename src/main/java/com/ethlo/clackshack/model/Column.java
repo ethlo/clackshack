@@ -1,4 +1,4 @@
-package com.ethlo.clackshack;
+package com.ethlo.clackshack.model;
 
 /*-
  * #%L
@@ -22,22 +22,33 @@ package com.ethlo.clackshack;
  * #L%
  */
 
-import java.util.function.Function;
+import java.io.Serializable;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.ethlo.clackshack.model.QueryProgress;
-
-public interface QueryProgressListener extends Function<QueryProgress, Boolean>
+public class Column
 {
-    Logger logger = LoggerFactory.getLogger(QueryProgressListener.class);
+    private String name;
+    private String type;
+    private Serializable value;
 
-    QueryProgressListener NOP = queryProgress -> true;
-
-    QueryProgressListener LOGGER = p ->
+    public Column(final String name, final String type, final Serializable value)
     {
-        logger.info("Progress: {}", p);
-        return true;
-    };
+        this.name = name;
+        this.type = type;
+        this.value = value;
+    }
+
+    public String getName()
+    {
+        return name;
+    }
+
+    public String getType()
+    {
+        return type;
+    }
+
+    public Serializable getValue()
+    {
+        return value;
+    }
 }

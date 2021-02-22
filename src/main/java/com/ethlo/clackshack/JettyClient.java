@@ -1,14 +1,34 @@
 package com.ethlo.clackshack;
 
+/*-
+ * #%L
+ * clackshack
+ * %%
+ * Copyright (C) 2017 - 2021 Morten Haraldsen (ethlo)
+ * %%
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * #L%
+ */
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
@@ -17,7 +37,11 @@ import org.eclipse.jetty.client.api.Request;
 import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryProgress;
 import com.ethlo.clackshack.model.QueryResult;
+import com.ethlo.clackshack.util.QueryParams;
+import com.ethlo.clackshack.util.QueryUtil;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 public class JettyClient implements Client
 {
@@ -29,6 +53,12 @@ public class JettyClient implements Client
     public static final String PARAM_PREFIX = "param_";
     public static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     public static final String APPLICATION_JSON_CONTENT_TYPE = "application/json";
+
+    static
+    {
+        mapper.registerModule(new JavaTimeModule());
+        mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
+    }
 
     private final String baseUrl;
     private final HttpClient client;
@@ -48,38 +78,16 @@ public class JettyClient implements Client
         }
     }
 
-    public static String format(String format, List<QueryParam> values)
+    @Override
+    public CompletableFuture<QueryResult> query(final String query, final Map<String, Object> params, final QueryProgressListener queryProgressListener)
     {
-        final StringBuilder formatter = new StringBuilder(format);
-        final List<Object> valueList = new ArrayList<>();
-        final Matcher matcher = Pattern.compile(":(\\w+)").matcher(format);
-
-        while (matcher.find())
-        {
-            String key = matcher.group(1);
-            String formatKey = String.format(":%s", key);
-            final int index = formatter.indexOf(formatKey);
-
-            if (index != -1)
-            {
-                formatter.replace(index, index + formatKey.length(), "%s");
-                final QueryParam param = getValue(key, values);
-                valueList.add(String.format("{%s:%s}", param.getName(), param.getType()));
-            }
-        }
-
-        return String.format(formatter.toString(), valueList.toArray());
-    }
-
-    private static QueryParam getValue(final String key, final List<QueryParam> values)
-    {
-        return values.stream().filter(v -> v.getName().equals(key)).findFirst().orElseThrow(() -> new IllegalArgumentException("No such param name: " + key));
+        return query(query, QueryParams.asList(params), queryProgressListener);
     }
 
     @Override
     public CompletableFuture<QueryResult> query(final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener)
     {
-        final String rewritten = format(query, params);
+        final String rewritten = QueryUtil.format(query, params);
 
         final Request req = client.newRequest(baseUrl)
                 .param(QUERY, rewritten + " format JSON")
@@ -122,7 +130,7 @@ public class JettyClient implements Client
         }
         catch (Exception e)
         {
-            throw new UncheckedIOException(new IOException("Error while closing http client", e));
+            throw new UncheckedIOException(new IOException("Error while closing HTTP client", e));
         }
     }
 

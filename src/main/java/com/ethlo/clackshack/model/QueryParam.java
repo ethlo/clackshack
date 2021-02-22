@@ -1,7 +1,30 @@
 package com.ethlo.clackshack.model;
 
+/*-
+ * #%L
+ * clackshack
+ * %%
+ * Copyright (C) 2017 - 2021 Morten Haraldsen (ethlo)
+ * %%
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * #L%
+ */
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 public class QueryParam
 {
@@ -11,9 +34,19 @@ public class QueryParam
 
     public QueryParam(final String name, final String type, final Object value)
     {
-        this.name = name;
-        this.type = type;
-        this.value = value;
+        this.name = Objects.requireNonNull(name, "name cannot be null");
+        this.type = Objects.requireNonNull(type, "type cannot be null");
+        this.value = Objects.requireNonNull(value, "value cannot be null");
+    }
+
+    public static QueryParam of(final String name, final byte value)
+    {
+        return new QueryParam(name, "Int8", value);
+    }
+
+    public static QueryParam of(final String name, final short value)
+    {
+        return new QueryParam(name, "Int16", value);
     }
 
     public static QueryParam of(final String name, final int value)
@@ -29,6 +62,21 @@ public class QueryParam
     public static QueryParam of(final String name, final String value)
     {
         return new QueryParam(name, "String", value);
+    }
+
+    public static QueryParam of(final String name, final boolean value)
+    {
+        return new QueryParam(name, "UInt8", value ? 1 : 0);
+    }
+
+    public static QueryParam of(final String name, final float value)
+    {
+        return new QueryParam(name, "Float32", value);
+    }
+
+    public static QueryParam of(final String name, final double value)
+    {
+        return new QueryParam(name, "Float64", value);
     }
 
     public static QueryParam of(final String name, final LocalDateTime dateTime)
