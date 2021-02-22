@@ -4,23 +4,22 @@ package com.ethlo.clackshack;
  * #%L
  * clackshack
  * %%
- * Copyright (C) 2017 - 2021 Morten Haraldsen (ethlo)
+ * Copyright (C) 2021 Morten Haraldsen (ethlo)
  * %%
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Lesser Public License for more details.
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Lesser Public
- * License along with this program.  If not, see
- * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  * #L%
  */
+
 
 import java.util.Collections;
 import java.util.List;
@@ -32,19 +31,51 @@ import com.ethlo.clackshack.model.QueryResult;
 
 public interface Client extends AutoCloseable
 {
+    /**
+     * Simple, non-parameterized query method
+     *
+     * @param query The SQL query
+     * @return a promise that holds the result of the query
+     */
     default CompletableFuture<QueryResult> query(final String query)
     {
         return query(query, Collections.emptyList(), QueryProgressListener.NOP);
     }
 
+    /**
+     * Simple, non-parameterized query method with progress listener
+     *
+     * @param query                 The SQL query
+     * @param queryProgressListener A progress listener that will be called every time ClickHouse provides an updated progress header
+     * @return a promise that holds the result of the query
+     */
     default CompletableFuture<QueryResult> query(final String query, final QueryProgressListener queryProgressListener)
     {
         return query(query, Collections.emptyList(), queryProgressListener);
     }
 
+    /**
+     * Parameterized query method with progress  listener
+     *
+     * @param query                 The SQL query
+     * @param params                The named parameters for the query
+     * @param queryProgressListener A progress listener that will be called every time ClickHouse provides an updated progress header
+     * @return a promise that holds the result of the query
+     */
     CompletableFuture<QueryResult> query(final String query, final Map<String, Object> params, final QueryProgressListener queryProgressListener);
 
+    /**
+     * Parameterized query method with progress  listener
+     *
+     * @param query                 The SQL query
+     * @param params                The named parameters for the query
+     * @param queryProgressListener A progress listener that will be called every time ClickHouse provides an updated progress header
+     * @return a promise that holds the result of the query
+     */
     CompletableFuture<QueryResult> query(final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener);
 
+    /**
+     * Close any resources held by the client
+     */
     void close();
 }

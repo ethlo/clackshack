@@ -1,4 +1,4 @@
-package com.ethlo.clackshack.model;
+package com.ethlo.clackshack;
 
 /*-
  * #%L
@@ -20,34 +20,11 @@ package com.ethlo.clackshack.model;
  * #L%
  */
 
-
-import java.io.Serializable;
-
-public class Column
+public class TypeConverterTest
 {
-    private String name;
-    private String type;
-    private Serializable value;
-
-    public Column(final String name, final String type, final Serializable value)
+    @org.junit.Test
+    public void testInputTypes()
     {
-        this.name = name;
-        this.type = type;
-        this.value = value;
-    }
-
-    public String getName()
-    {
-        return name;
-    }
-
-    public String getType()
-    {
-        return type;
-    }
-
-    public Serializable getValue()
-    {
-        return value;
+        
     }
 }
