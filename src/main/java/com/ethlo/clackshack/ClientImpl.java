@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
@@ -43,7 +44,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-public class JettyClient implements Client
+public class ClientImpl implements Client
 {
     public static final ObjectMapper mapper = new ObjectMapper();
     public static final String CLICK_HOUSE_PROGRESS_HEADER_NAME = "X-ClickHouse-Progress";
@@ -55,7 +56,7 @@ public class JettyClient implements Client
     public static final String PARAM_PREFIX = "param_";
     public static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     public static final String APPLICATION_JSON_CONTENT_TYPE = "application/json";
-    private static final Logger logger = LoggerFactory.getLogger(JettyClient.class);
+    private static final Logger logger = LoggerFactory.getLogger(ClientImpl.class);
 
     static
     {
@@ -66,7 +67,7 @@ public class JettyClient implements Client
     private final String baseUrl;
     private final HttpClient client;
 
-    public JettyClient(String baseUrl)
+    public ClientImpl(String baseUrl)
     {
         this.baseUrl = baseUrl;
         this.client = new HttpClient();
@@ -87,6 +88,8 @@ public class JettyClient implements Client
         logger.debug("Running query with id {}: {}", queryId, query);
 
         final String rewritten = QueryUtil.format(query, params);
+        final AtomicBoolean killed = new AtomicBoolean(false);
+        final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
 
         final Request req = client.newRequest(baseUrl)
                 .param(QUERY_PARAM, rewritten + " format JSON")
@@ -98,14 +101,20 @@ public class JettyClient implements Client
                 {
                     if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
                     {
-                        queryProgressListener.apply(readJson(httpField.getValue(), QueryProgress.class));
+                        final boolean continueProcessing = queryProgressListener.apply(readJson(httpField.getValue(), QueryProgress.class));
+                        if (!continueProcessing && !killed.get())
+                        {
+                            logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
+                            killQuery(queryId);
+                            killed.set(true);
+                            completable.completeExceptionally(new QueryAbortedException(queryId, query));
+                        }
                     }
                     return true;
                 });
 
         params.forEach((param) -> req.param(PARAM_PREFIX + param.getName(), param.getValue().toString()));
 
-        final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
         req.send(new CompletableFutureResponseListener(completable));
         return completable.thenApply(response ->
         {

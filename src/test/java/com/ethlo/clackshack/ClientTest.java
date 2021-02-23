@@ -31,6 +31,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ public class ClientTest
     @Test
     public void testQueryClickHouse()
     {
-        try (final Client client = new JettyClient(baseUrl))
+        try (final Client client = new ClientImpl(baseUrl))
         {
             final String query = "SELECT id, created, code, result FROM validations " +
                     "where id > :id " +
@@ -78,7 +79,7 @@ public class ClientTest
     public void testQueryProgressClickHouse()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
-        try (final Client client = new JettyClient(baseUrl))
+        try (final Client client = new ClientImpl(baseUrl))
         {
             final String query = "SELECT count() from numbers(2000000000)";
             synchronous(client.query("some-progress-query", query, p ->
@@ -92,10 +93,29 @@ public class ClientTest
         assertThat(progressList).isNotEmpty();
     }
 
+    @Test(expected = QueryAbortedException.class)
+    public void testQueryProgressAbort()
+    {
+        final List<QueryProgress> progressList = new LinkedList<>();
+        try (final Client client = new ClientImpl(baseUrl))
+        {
+            final AtomicInteger counter = new AtomicInteger();
+            final String query = "SELECT count() from numbers(2000000000)";
+            synchronous(client.query("some-progress-query", query, p ->
+            {
+                logger.info("{}", p);
+                progressList.add(p);
+                return counter.incrementAndGet() < 5;
+            }).thenAccept(result -> logger.info("\n{}", result)));
+        }
+
+        assertThat(progressList).isNotEmpty();
+    }
+
     @Test
     public void testSameQueryIdShouldThrow() throws InterruptedException
     {
-        try (final Client client = new JettyClient(baseUrl))
+        try (final Client client = new ClientImpl(baseUrl))
         {
             final String queryId = "some-query-id";
 
@@ -121,7 +141,7 @@ public class ClientTest
     @Test
     public void testSameQueryIdShouldReplace() throws ExecutionException, InterruptedException
     {
-        try (final Client client = new JettyClient(baseUrl))
+        try (final Client client = new ClientImpl(baseUrl))
         {
             final String queryId = "some-query-id";
 

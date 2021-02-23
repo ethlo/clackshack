@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.ethlo.clackshack.TypeConversionException;
-import com.ethlo.clackshack.JettyClient;
+import com.ethlo.clackshack.ClientImpl;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -129,7 +129,7 @@ public class QueryResult
     {
         try
         {
-            return JettyClient.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+            return ClientImpl.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(this);
         }
         catch (JsonProcessingException e)
         {
