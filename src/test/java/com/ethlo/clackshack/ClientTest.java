@@ -21,7 +21,9 @@ package com.ethlo.clackshack;
  */
 
 
+import static com.ethlo.clackshack.util.AsyncHelper.synchronous;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -43,7 +45,7 @@ public class ClientTest
     private static final String baseUrl = "http://localhost:8123";
 
     @Test
-    public void testQueryClickHouse() throws ExecutionException, InterruptedException
+    public void testQueryClickHouse()
     {
         try (final Client client = new JettyClient(baseUrl))
         {
@@ -61,37 +63,37 @@ public class ClientTest
                     "max_created", LocalDateTime.now(),
                     "result", "y"
             );
-            client.query("my-query", query, params, progress -> true).thenAccept(result ->
+            synchronous(client.query("my-query", query, params, progress -> true).thenAccept(result ->
             {
                 logger.info("\n{}", result);
 
                 final Object created = result.asTypedMap().get(0).get("created");
                 assertThat(created).isNotNull();
                 assertThat(created).isInstanceOf(LocalDateTime.class);
-            }).get();
+            }));
         }
     }
 
     @Test
-    public void testQueryProgressClickHouse() throws ExecutionException, InterruptedException
+    public void testQueryProgressClickHouse()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
         try (final Client client = new JettyClient(baseUrl))
         {
             final String query = "SELECT count() from numbers(2000000000)";
-            client.query("some-progress-query", query, p ->
+            synchronous(client.query("some-progress-query", query, p ->
             {
                 logger.info("{}", p);
                 progressList.add(p);
                 return true;
-            }).thenAccept(result -> logger.info("\n{}", result)).get();
+            }).thenAccept(result -> logger.info("\n{}", result)));
         }
 
         assertThat(progressList).isNotEmpty();
     }
 
     @Test
-    public void testSameQueryIdShouldThrow() throws ExecutionException, InterruptedException
+    public void testSameQueryIdShouldThrow() throws InterruptedException
     {
         try (final Client client = new JettyClient(baseUrl))
         {
@@ -104,13 +106,14 @@ public class ClientTest
             try
             {
                 client.query(queryId, false, query, Collections.emptyMap(), QueryProgressListener.NOP).thenAccept(result -> logger.info("\n{}", result)).get();
+                fail("Should fail as the same query id already is in progress");
             }
             catch (ExecutionException expected)
             {
                 assertThat(expected.getCause()).isInstanceOf(DuplicateQueryIdException.class);
 
                 // Kill the initial query to avoid having to wait for it
-                client.killQuery(queryId).get();
+                client.killQuery(queryId);
             }
         }
     }

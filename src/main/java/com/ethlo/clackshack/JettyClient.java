@@ -27,14 +27,13 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryProgress;
@@ -48,16 +47,15 @@ public class JettyClient implements Client
 {
     public static final ObjectMapper mapper = new ObjectMapper();
     public static final String CLICK_HOUSE_PROGRESS_HEADER_NAME = "X-ClickHouse-Progress";
-
     public static final String WAIT_END_OF_QUERY_PARAM = "wait_end_of_query";
     public static final String SEND_PROGRESS_IN_HTTP_HEADERS_PARAM = "send_progress_in_http_headers";
     public static final String QUERY_PARAM = "query";
     public static final String QUERY_ID_PARAM = "query_id";
     public static final String REPLACE_RUNNING_QUERY_PARAM = "replace_running_query";
     public static final String PARAM_PREFIX = "param_";
-
     public static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     public static final String APPLICATION_JSON_CONTENT_TYPE = "application/json";
+    private static final Logger logger = LoggerFactory.getLogger(JettyClient.class);
 
     static
     {
@@ -86,6 +84,8 @@ public class JettyClient implements Client
     @Override
     public CompletableFuture<QueryResult> query(final String queryId, final boolean replaceExistingQuery, final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener)
     {
+        logger.debug("Running query with id {}: {}", queryId, query);
+
         final String rewritten = QueryUtil.format(query, params);
 
         final Request req = client.newRequest(baseUrl)
