@@ -66,6 +66,7 @@ public class ClientTest
 
                 final Object created = result.asTypedMap().get(0).get("created");
                 assertThat(created).isNotNull();
+                assertThat(created).isInstanceOf(LocalDateTime.class);
             }).get();
         }
     }
