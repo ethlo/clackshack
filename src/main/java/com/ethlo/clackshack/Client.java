@@ -24,55 +24,91 @@ package com.ethlo.clackshack;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryResult;
+import com.ethlo.clackshack.util.QueryParams;
 
 public interface Client extends AutoCloseable
 {
     /**
      * Simple, non-parameterized query method
      *
-     * @param query The SQL query
+     * @param queryId The ID to assign this query
+     * @param query   The SQL query
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<QueryResult> query(final String query)
+    default CompletableFuture<QueryResult> query(final String queryId, final String query)
     {
-        return query(query, Collections.emptyList(), QueryProgressListener.NOP);
+        return query(queryId, false, query, Collections.emptyList(), QueryProgressListener.NOP);
     }
 
     /**
      * Simple, non-parameterized query method with progress listener
      *
+     * @param queryId               The ID to assign this query
      * @param query                 The SQL query
      * @param queryProgressListener A progress listener that will be called every time ClickHouse provides an updated progress header
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<QueryResult> query(final String query, final QueryProgressListener queryProgressListener)
+    default CompletableFuture<QueryResult> query(final String queryId, final String query, final QueryProgressListener queryProgressListener)
     {
-        return query(query, Collections.emptyList(), queryProgressListener);
+        return query(queryId, false, query, Collections.emptyList(), queryProgressListener);
     }
 
     /**
      * Parameterized query method with progress  listener
      *
+     * @param queryId               The ID to assign this query
      * @param query                 The SQL query
      * @param params                The named parameters for the query
      * @param queryProgressListener A progress listener that will be called every time ClickHouse provides an updated progress header
      * @return a promise that holds the result of the query
      */
-    CompletableFuture<QueryResult> query(final String query, final Map<String, Object> params, final QueryProgressListener queryProgressListener);
+    default CompletableFuture<QueryResult> query(final String queryId, final String query, final Map<String, Object> params, final QueryProgressListener queryProgressListener)
+    {
+        return query(queryId, false, query, QueryParams.asList(params), queryProgressListener);
+    }
 
     /**
      * Parameterized query method with progress  listener
      *
+     * @param queryId               The ID to assign this query
+     * @param replaceExistingQuery  Whether to replace the existing query or throw an exception if it is already in progress
      * @param query                 The SQL query
      * @param params                The named parameters for the query
      * @param queryProgressListener A progress listener that will be called every time ClickHouse provides an updated progress header
      * @return a promise that holds the result of the query
      */
-    CompletableFuture<QueryResult> query(final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener);
+    default CompletableFuture<QueryResult> query(final String queryId, final boolean replaceExistingQuery, final String query, final Map<String, Object> params, final QueryProgressListener queryProgressListener)
+    {
+        return query(queryId, replaceExistingQuery, query, QueryParams.asList(params), queryProgressListener);
+    }
+
+    /**
+     * Kill the query with the specified query ID
+     *
+     * @param queryId the id of the query to kill
+     * @return True if the query was found, false if it did not exist
+     */
+    default CompletableFuture<Boolean> killQuery(String queryId)
+    {
+        return query(queryId, true, "SELECT 1", Collections.emptyList(), p -> true).thenApply(Objects::nonNull);
+    }
+
+    /**
+     * Parameterized query method with progress  listener
+     *
+     * @param queryId               The ID to assign this query
+     * @param replaceExistingQuery  Whether to replace the existing query or throw an exception if it is already in progress
+     * @param query                 The SQL query
+     * @param params                The named parameters for the query
+     * @param queryProgressListener A progress listener that will be called every time ClickHouse provides an updated progress header
+     * @return a promise that holds the result of the query
+     */
+    CompletableFuture<QueryResult> query(final String queryId, final boolean replaceExistingQuery, final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener);
 
     /**
      * Close any resources held by the client

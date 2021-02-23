@@ -26,8 +26,11 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
@@ -36,7 +39,6 @@ import org.eclipse.jetty.client.api.Request;
 import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryProgress;
 import com.ethlo.clackshack.model.QueryResult;
-import com.ethlo.clackshack.util.QueryParams;
 import com.ethlo.clackshack.util.QueryUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,10 +48,14 @@ public class JettyClient implements Client
 {
     public static final ObjectMapper mapper = new ObjectMapper();
     public static final String CLICK_HOUSE_PROGRESS_HEADER_NAME = "X-ClickHouse-Progress";
-    public static final String WAIT_END_OF_QUERY = "wait_end_of_query";
-    public static final String SEND_PROGRESS_IN_HTTP_HEADERS = "send_progress_in_http_headers";
-    public static final String QUERY = "query";
+
+    public static final String WAIT_END_OF_QUERY_PARAM = "wait_end_of_query";
+    public static final String SEND_PROGRESS_IN_HTTP_HEADERS_PARAM = "send_progress_in_http_headers";
+    public static final String QUERY_PARAM = "query";
+    public static final String QUERY_ID_PARAM = "query_id";
+    public static final String REPLACE_RUNNING_QUERY_PARAM = "replace_running_query";
     public static final String PARAM_PREFIX = "param_";
+
     public static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     public static final String APPLICATION_JSON_CONTENT_TYPE = "application/json";
 
@@ -78,20 +84,16 @@ public class JettyClient implements Client
     }
 
     @Override
-    public CompletableFuture<QueryResult> query(final String query, final Map<String, Object> params, final QueryProgressListener queryProgressListener)
-    {
-        return query(query, QueryParams.asList(params), queryProgressListener);
-    }
-
-    @Override
-    public CompletableFuture<QueryResult> query(final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener)
+    public CompletableFuture<QueryResult> query(final String queryId, final boolean replaceExistingQuery, final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener)
     {
         final String rewritten = QueryUtil.format(query, params);
 
         final Request req = client.newRequest(baseUrl)
-                .param(QUERY, rewritten + " format JSON")
-                .param(WAIT_END_OF_QUERY, "1")
-                .param(SEND_PROGRESS_IN_HTTP_HEADERS, "1")
+                .param(QUERY_PARAM, rewritten + " format JSON")
+                .param(QUERY_ID_PARAM, Objects.requireNonNull(queryId, "queryId must not be null"))
+                .param(REPLACE_RUNNING_QUERY_PARAM, replaceExistingQuery ? "1" : "0")
+                .param(WAIT_END_OF_QUERY_PARAM, "1")
+                .param(SEND_PROGRESS_IN_HTTP_HEADERS_PARAM, "1")
                 .onResponseHeader((response, httpField) ->
                 {
                     if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
@@ -115,7 +117,7 @@ public class JettyClient implements Client
             }
             else
             {
-                throw new UncheckedIOException(new IOException(strContent));
+                throw ClickHouseErrorParser.handleError(strContent);
             }
         });
     }

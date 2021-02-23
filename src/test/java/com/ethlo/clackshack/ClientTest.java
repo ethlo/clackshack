@@ -24,6 +24,7 @@ package com.ethlo.clackshack;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,7 @@ public class ClientTest
                     "max_created", LocalDateTime.now(),
                     "result", "y"
             );
-            client.query(query, params, progress -> true).thenAccept(result ->
+            client.query("my-query", query, params, progress -> true).thenAccept(result ->
             {
                 logger.info("\n{}", result);
 
@@ -77,8 +78,8 @@ public class ClientTest
         final List<QueryProgress> progressList = new LinkedList<>();
         try (final Client client = new JettyClient(baseUrl))
         {
-            final String query = "SELECT count() from numbers(10000000000)";
-            client.query(query, p ->
+            final String query = "SELECT count() from numbers(2000000000)";
+            client.query("some-progress-query", query, p ->
             {
                 logger.info("{}", p);
                 progressList.add(p);
@@ -87,5 +88,45 @@ public class ClientTest
         }
 
         assertThat(progressList).isNotEmpty();
+    }
+
+    @Test
+    public void testSameQueryIdShouldThrow() throws ExecutionException, InterruptedException
+    {
+        try (final Client client = new JettyClient(baseUrl))
+        {
+            final String queryId = "some-query-id";
+
+            final String query = "SELECT count() from numbers(10000000000)";
+            client.query(queryId, query, QueryProgressListener.LOGGER).thenAccept(result -> logger.info("\n{}", result));
+
+            // Same query again, with same id
+            try
+            {
+                client.query(queryId, false, query, Collections.emptyMap(), QueryProgressListener.NOP).thenAccept(result -> logger.info("\n{}", result)).get();
+            }
+            catch (ExecutionException expected)
+            {
+                assertThat(expected.getCause()).isInstanceOf(DuplicateQueryIdException.class);
+
+                // Kill the initial query to avoid having to wait for it
+                client.killQuery(queryId).get();
+            }
+        }
+    }
+
+    @Test
+    public void testSameQueryIdShouldReplace() throws ExecutionException, InterruptedException
+    {
+        try (final Client client = new JettyClient(baseUrl))
+        {
+            final String queryId = "some-query-id";
+
+            final String query = "SELECT count() from numbers(1000000000)";
+            client.query(queryId, query, QueryProgressListener.NOP).thenAccept(result -> logger.info("\n{}", result));
+
+            // Same query again, with same id
+            client.query(queryId, true, query, Collections.emptyMap(), p -> true).thenAccept(result -> logger.info("\n{}", result)).get();
+        }
     }
 }
