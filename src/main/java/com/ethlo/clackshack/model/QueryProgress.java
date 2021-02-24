@@ -42,7 +42,7 @@ public class QueryProgress
 
     public double getPercentDone()
     {
-        if (getReadBytes() != 0 && getTotalRowsToRead() != 0)
+        if (getReadRows() != 0 && getTotalRowsToRead() != 0)
         {
             return getReadRows() / (double) getTotalRowsToRead() * 100;
         }
@@ -67,7 +67,7 @@ public class QueryProgress
     @Override
     public String toString()
     {
-        return "QueryProgressData{progress=" + getPercentDone() + "%, " +
+        return "QueryProgress{progress=" + getPercentDone() + "%, " +
                 "readRows=" + readRows +
                 ", readBytes=" + readBytes +
                 ", totalRowsToRead=" + totalRowsToRead +

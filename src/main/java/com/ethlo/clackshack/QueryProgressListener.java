@@ -21,19 +21,15 @@ package com.ethlo.clackshack;
  */
 
 
-import java.util.function.Function;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ethlo.clackshack.model.QueryProgress;
 
-public interface QueryProgressListener extends Function<QueryProgress, Boolean>
+public interface QueryProgressListener
 {
     Logger logger = LoggerFactory.getLogger("query-progress");
-
     QueryProgressListener NOP = queryProgress -> true;
-
     /**
      * Simple logger that logs the progress to the 'query-progress' logger
      */
@@ -42,4 +38,12 @@ public interface QueryProgressListener extends Function<QueryProgress, Boolean>
         logger.info("{}", p);
         return true;
     };
+
+    /**
+     * Progress callback for the query
+     *
+     * @param queryProgress The current progress
+     * @return true to continue processing the query, false to cancel.
+     */
+    boolean progress(QueryProgress queryProgress);
 }

@@ -25,10 +25,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
@@ -88,7 +91,8 @@ public class ClientImpl implements Client
         logger.debug("Running query with id {}: {}", queryId, query);
 
         final String rewritten = QueryUtil.format(query, params);
-        final AtomicBoolean killed = new AtomicBoolean(false);
+        final AtomicBoolean killedMarker = new AtomicBoolean(false);
+        final AtomicReference<Long> max = new AtomicReference<>();
         final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
 
         final Request req = client.newRequest(baseUrl)
@@ -101,13 +105,15 @@ public class ClientImpl implements Client
                 {
                     if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
                     {
-                        final boolean continueProcessing = queryProgressListener.apply(readJson(httpField.getValue(), QueryProgress.class));
-                        if (!continueProcessing && !killed.get())
+                        final QueryProgress progress = readJson(httpField.getValue(), QueryProgress.class);
+                        max.set(progress.getTotalRowsToRead());
+                        final boolean continueProcessing = queryProgressListener.progress(progress);
+                        if (!continueProcessing && !killedMarker.get())
                         {
                             logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
                             killQuery(queryId);
-                            killed.set(true);
-                            completable.completeExceptionally(new QueryAbortedException(queryId, query));
+                            killedMarker.set(true);
+                            completable.completeExceptionally(new QueryAbortedException());
                         }
                     }
                     return true;
@@ -115,19 +121,31 @@ public class ClientImpl implements Client
 
         params.forEach((param) -> req.param(PARAM_PREFIX + param.getName(), param.getValue().toString()));
 
+        // Send final notification when done
+        completable.whenComplete((res, exc) -> Optional.ofNullable(max.get()).ifPresent(m -> queryProgressListener.progress(new QueryProgress(m, 0, m))));
+
+        // Perform request
         req.send(new CompletableFutureResponseListener(completable));
+
+        // Process response
         return completable.thenApply(response ->
         {
             final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
             final String strContent = StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
-            if (contentType != null && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
+            if (contentType != null)
             {
-                return readJson(strContent, QueryResult.class);
+                final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
+                if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
+                {
+                    return readJson(strContent, QueryResult.class);
+                }
+                else if (error.isPresent())
+                {
+                    throw ClickHouseErrorParser.handle(error.get());
+                }
+                throw new UncheckedIOException(new IOException("Unable to handle response from ClickHouse: " + strContent));
             }
-            else
-            {
-                throw ClickHouseErrorParser.handleError(strContent);
-            }
+            throw new UncheckedIOException(new IOException("No content type sent from ClickHouse: " + strContent));
         });
     }
 
