@@ -21,23 +21,27 @@ package com.ethlo.clackshack;
  */
 
 
-import static com.ethlo.clackshack.util.AsyncHelper.synchronous;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ethlo.clackshack.model.QueryProgress;
+import com.ethlo.clackshack.model.QueryResult;
 
 public class ClientTest
 {
@@ -64,36 +68,35 @@ public class ClientTest
                     "max_created", LocalDateTime.now(),
                     "result", "y"
             );
-            synchronous(client.query("my-query", query, params, progress -> true).thenAccept(result ->
+            client.query(query, params).thenAccept(result ->
             {
                 logger.info("\n{}", result);
-
                 final Object created = result.asTypedMap().get(0).get("created");
                 assertThat(created).isNotNull();
                 assertThat(created).isInstanceOf(LocalDateTime.class);
-            }));
+            }).join();
         }
     }
 
     @Test
-    public void testQueryProgressClickHouse()
+    public void testQueryProgress()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
         try (final Client client = new ClientImpl(baseUrl))
         {
             final String query = "SELECT count() from numbers(2000000000)";
-            synchronous(client.query("some-progress-query", query, p ->
+            client.query(query, QueryOptions.create().progressListener(p ->
             {
                 logger.info("{}", p);
                 progressList.add(p);
                 return true;
-            }).thenAccept(result -> logger.info("\n{}", result)));
+            })).thenAcceptAsync(result -> logger.info("\n{}", result)).join();
         }
 
         assertThat(progressList).isNotEmpty();
     }
 
-    @Test(expected = QueryAbortedException.class)
+    @Test
     public void testQueryProgressAbort()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
@@ -101,12 +104,55 @@ public class ClientTest
         {
             final AtomicInteger counter = new AtomicInteger();
             final String query = "SELECT count() from numbers(2000000000)";
-            synchronous(client.query("some-progress-query", query, p ->
+            final CompletableFuture<QueryResult> promise = client.query(query, QueryOptions.create()
+                    .queryId("some-progress-query")
+                    .progressListener(p ->
+                    {
+                        logger.info("{}", p);
+                        progressList.add(p);
+                        return counter.incrementAndGet() < 3;
+                    }));
+
+            try
             {
-                logger.info("{}", p);
-                progressList.add(p);
-                return counter.incrementAndGet() < 5;
-            }).thenAccept(result -> logger.info("\n{}", result)));
+                promise.join();
+                fail("Should have thrown exception");
+            }
+            catch (CompletionException exc)
+            {
+                assertThat(exc.getCause()).isInstanceOf(QueryAbortedException.class);
+            }
+        }
+
+        assertThat(progressList).isNotEmpty();
+    }
+
+    @Test
+    @Ignore
+    public void testQueryExecutionTimeExceeded()
+    {
+        final List<QueryProgress> progressList = new LinkedList<>();
+        try (final Client client = new ClientImpl(baseUrl))
+        {
+            final String query = "SELECT count() from numbers(2000000000)";
+            final CompletableFuture<QueryResult> promise = client.query(query, QueryOptions.create()
+                    .maxExecutionTime(Duration.ofSeconds(1))
+                    .progressListener(p ->
+                    {
+                        logger.info("{}", p);
+                        progressList.add(p);
+                        return true;
+                    }));
+
+            try
+            {
+                promise.join();
+                fail("Should have thrown exception");
+            }
+            catch (CompletionException exc)
+            {
+                assertThat(exc.getCause()).isInstanceOf(QueryAbortedException.class);
+            }
         }
 
         assertThat(progressList).isNotEmpty();
@@ -117,15 +163,17 @@ public class ClientTest
     {
         try (final Client client = new ClientImpl(baseUrl))
         {
-            final String queryId = "some-query-id";
+            final String queryId = UUID.randomUUID().toString();
+            final QueryOptions options = QueryOptions.create().queryId(queryId);
 
             final String query = "SELECT count() from numbers(10000000000)";
-            client.query(queryId, query, QueryProgressListener.LOGGER).thenAccept(result -> logger.info("\n{}", result));
+            client.query(query, options).thenAccept(result -> logger.info("\n{}", result));
+            Thread.sleep(10);
 
             // Same query again, with same id
             try
             {
-                client.query(queryId, false, query, Collections.emptyMap(), QueryProgressListener.NOP).thenAccept(result -> logger.info("\n{}", result)).get();
+                client.query(query, options).thenAccept(result -> logger.info("\n{}", result)).get();
                 fail("Should fail as the same query id already is in progress");
             }
             catch (ExecutionException expected)
@@ -139,17 +187,34 @@ public class ClientTest
     }
 
     @Test
-    public void testSameQueryIdShouldReplace() throws ExecutionException, InterruptedException
+    public void testSameQueryIdShouldReplace() throws InterruptedException
     {
         try (final Client client = new ClientImpl(baseUrl))
         {
-            final String queryId = "some-query-id";
+            final String queryId = UUID.randomUUID().toString();
 
             final String query = "SELECT count() from numbers(1000000000)";
-            client.query(queryId, query, QueryProgressListener.NOP).thenAccept(result -> logger.info("\n{}", result));
+            final CompletableFuture<QueryResult> original = client.query(query, QueryOptions.create()
+                    .queryId(queryId)
+                    .progressListener(QueryProgressListener.LOGGER));
+            Thread.sleep(50);
 
             // Same query again, with same id
-            client.query(queryId, true, query, Collections.emptyMap(), p -> true).thenAccept(result -> logger.info("\n{}", result)).get();
+            final QueryResult replacement = client.query(query, QueryOptions.create()
+                    .queryId(queryId)
+                    .replaceQuery(true)
+            ).join();
+            assertThat(replacement).isNotNull();
+
+            try
+            {
+                original.get();
+                fail("Should throw");
+            }
+            catch (ExecutionException exc)
+            {
+                assertThat(exc.getCause()).isInstanceOf(QueryAbortedException.class);
+            }
         }
     }
 }

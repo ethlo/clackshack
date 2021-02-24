@@ -29,6 +29,7 @@ import java.util.AbstractMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.http.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +62,7 @@ public class ClientImpl implements Client
     public static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     public static final String APPLICATION_JSON_CONTENT_TYPE = "application/json";
     private static final Logger logger = LoggerFactory.getLogger(ClientImpl.class);
+    private static final String MAX_EXECUTION_TIME_PARAM = "max_execution_time";
 
     static
     {
@@ -86,8 +89,11 @@ public class ClientImpl implements Client
     }
 
     @Override
-    public CompletableFuture<QueryResult> query(final String queryId, final boolean replaceExistingQuery, final String query, final List<QueryParam> params, final QueryProgressListener queryProgressListener)
+    public CompletableFuture<QueryResult> query(final String query,
+                                                final List<QueryParam> params,
+                                                final QueryOptions queryOptions)
     {
+        final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
         logger.debug("Running query with id {}: {}", queryId, query);
 
         final String rewritten = QueryUtil.format(query, params);
@@ -96,39 +102,52 @@ public class ClientImpl implements Client
         final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
 
         final Request req = client.newRequest(baseUrl)
+                .method(HttpMethod.POST)
                 .param(QUERY_PARAM, rewritten + " format JSON")
                 .param(QUERY_ID_PARAM, Objects.requireNonNull(queryId, "queryId must not be null"))
-                .param(REPLACE_RUNNING_QUERY_PARAM, replaceExistingQuery ? "1" : "0")
-                .param(WAIT_END_OF_QUERY_PARAM, "1")
-                .param(SEND_PROGRESS_IN_HTTP_HEADERS_PARAM, "1")
-                .onResponseHeader((response, httpField) ->
+                .param(REPLACE_RUNNING_QUERY_PARAM, queryOptions.replaceQuery() ? "1" : "0");
+
+        // Enable progress headers
+        if (queryOptions.progressListener().isPresent())
+        {
+            final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
+            req.onResponseHeader((response, httpField) ->
+            {
+                if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
                 {
-                    if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
+                    final QueryProgress progress = readJson(httpField.getValue(), QueryProgress.class);
+                    max.set(progress.getTotalRowsToRead());
+                    final boolean continueProcessing = queryProgressListener.progress(progress);
+                    if (!continueProcessing && !killedMarker.get())
                     {
-                        final QueryProgress progress = readJson(httpField.getValue(), QueryProgress.class);
-                        max.set(progress.getTotalRowsToRead());
-                        final boolean continueProcessing = queryProgressListener.progress(progress);
-                        if (!continueProcessing && !killedMarker.get())
-                        {
-                            logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
-                            killQuery(queryId);
-                            killedMarker.set(true);
-                            completable.completeExceptionally(new QueryAbortedException());
-                        }
+                        logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
+                        killQuery(queryId);
+                        killedMarker.set(true);
+                        completable.completeExceptionally(new QueryAbortedException());
                     }
-                    return true;
-                });
+                }
+                return true;
+            });
+            req.param(WAIT_END_OF_QUERY_PARAM, "1");
+            req.param(SEND_PROGRESS_IN_HTTP_HEADERS_PARAM, "1");
+
+            // Send final notification when done
+            if (!killedMarker.get())
+            {
+                completable.whenCompleteAsync((res, exc) -> Optional.ofNullable(max.get()).ifPresent(m -> queryProgressListener.progress(new QueryProgress(m, 0, m))));
+            }
+        }
+
+        // Enable max query time
+        queryOptions.maxExecutionTime().ifPresent(duration -> req.param(MAX_EXECUTION_TIME_PARAM, Long.toString(duration.toSeconds())));
 
         params.forEach((param) -> req.param(PARAM_PREFIX + param.getName(), param.getValue().toString()));
-
-        // Send final notification when done
-        completable.whenComplete((res, exc) -> Optional.ofNullable(max.get()).ifPresent(m -> queryProgressListener.progress(new QueryProgress(m, 0, m))));
 
         // Perform request
         req.send(new CompletableFutureResponseListener(completable));
 
         // Process response
-        return completable.thenApply(response ->
+        return completable.thenApplyAsync(response ->
         {
             final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
             final String strContent = StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
