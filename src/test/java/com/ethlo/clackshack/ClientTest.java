@@ -128,6 +128,42 @@ public class ClientTest
     }
 
     @Test
+    public void testKillExisting() throws InterruptedException
+    {
+        try (final Client client = new ClientImpl(baseUrl))
+        {
+            final String queryId = UUID.randomUUID().toString();
+            final String query = "SELECT count() from numbers(20000000000)";
+            final CompletableFuture<QueryResult> promise = client.query(query, QueryOptions.create().queryId(queryId));
+            Thread.sleep(10);
+            final CompletableFuture<Boolean> killResult = client.killQuery(queryId);
+
+            killResult.join();
+            logger.info("Killed");
+
+            try
+            {
+                final QueryResult result = promise.join();
+                logger.info("Query: {}", result);
+            }
+            catch (CompletionException exc)
+            {
+                assertThat(exc.getCause()).isInstanceOf(QueryAbortedException.class);
+            }
+        }
+    }
+
+    @Test
+    public void testKillNonExisting()
+    {
+        try (final Client client = new ClientImpl(baseUrl))
+        {
+            final Boolean killResult = client.killQuery(UUID.randomUUID().toString()).join();
+            logger.info("{}", killResult);
+        }
+    }
+
+    @Test
     @Ignore
     public void testQueryExecutionTimeExceeded()
     {
@@ -181,8 +217,8 @@ public class ClientTest
                 assertThat(expected.getCause()).isInstanceOf(DuplicateQueryIdException.class);
 
                 // Kill the initial query to avoid having to wait for it
-                final CompletableFuture<QueryResult> killResult = client.killQuery(queryId);
-                killResult.thenAccept(r -> logger.info("Kill result: {}", r.asTypedMap())).join();
+                final CompletableFuture<Boolean> killResult = client.killQuery(queryId);
+                killResult.thenAccept(r -> logger.info("Kill result: {}", r)).join();
             }
         }
     }

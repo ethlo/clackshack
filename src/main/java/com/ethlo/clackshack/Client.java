@@ -76,9 +76,10 @@ public interface Client extends AutoCloseable
      * @param queryId the id of the query to kill
      * @return True if the query was found, false if it did not exist
      */
-    default CompletableFuture<QueryResult> killQuery(String queryId)
+    default CompletableFuture<Boolean> killQuery(String queryId)
     {
-        return query("KILL QUERY WHERE query_id = :queryId", Collections.singletonMap("queryId", queryId), QueryOptions.DEFAULT);
+        //return query("KILL QUERY WHERE query_id = :queryId SYNC", Collections.singletonMap("queryId", queryId), QueryOptions.DEFAULT);
+        return query("SELECT 1", QueryOptions.create().queryId(queryId).replaceQuery(true)).thenApply(r -> true);
     }
 
     /**

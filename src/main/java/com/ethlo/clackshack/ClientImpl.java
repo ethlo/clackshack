@@ -121,7 +121,7 @@ public class ClientImpl implements Client
                     if (!continueProcessing && !killedMarker.get())
                     {
                         logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
-                        killQuery(queryId);
+                        killQuery(queryId).thenAccept(result -> logger.info("Killed {}", result));
                         killedMarker.set(true);
                         completable.completeExceptionally(new QueryAbortedException());
                     }
@@ -149,9 +149,10 @@ public class ClientImpl implements Client
         // Process response
         return completable.thenApplyAsync(response ->
         {
+            final int status = response.getStatus();
             final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
             final String strContent = StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
-            if (contentType != null)
+            if (!"".equals(strContent.trim()))
             {
                 final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
                 if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
@@ -162,9 +163,9 @@ public class ClientImpl implements Client
                 {
                     throw ClickHouseErrorParser.handle(error.get());
                 }
-                throw new UncheckedIOException(new IOException("Unable to handle response from ClickHouse: " + strContent));
+                throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
             }
-            throw new UncheckedIOException(new IOException("No content type sent from ClickHouse: " + strContent));
+            throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
         });
     }
 
