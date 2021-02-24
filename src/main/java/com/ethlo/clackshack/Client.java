@@ -24,7 +24,6 @@ package com.ethlo.clackshack;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import com.ethlo.clackshack.model.QueryParam;
@@ -36,7 +35,7 @@ public interface Client extends AutoCloseable
     /**
      * Parameterized query method with progress  listener
      *
-     * @param query  The SQL query
+     * @param query        The SQL query
      * @param queryOptions The query options for this query
      * @return a promise that holds the result of the query
      */
@@ -77,9 +76,9 @@ public interface Client extends AutoCloseable
      * @param queryId the id of the query to kill
      * @return True if the query was found, false if it did not exist
      */
-    default CompletableFuture<Boolean> killQuery(String queryId)
+    default CompletableFuture<QueryResult> killQuery(String queryId)
     {
-        return query("SELECT 1", Collections.emptyList(), QueryOptions.DEFAULT).thenApply(Objects::nonNull);
+        return query("KILL QUERY WHERE query_id = :queryId", Collections.singletonMap("queryId", queryId), QueryOptions.DEFAULT);
     }
 
     /**

@@ -181,7 +181,8 @@ public class ClientTest
                 assertThat(expected.getCause()).isInstanceOf(DuplicateQueryIdException.class);
 
                 // Kill the initial query to avoid having to wait for it
-                client.killQuery(queryId);
+                final CompletableFuture<QueryResult> killResult = client.killQuery(queryId);
+                killResult.thenAccept(r -> logger.info("Kill result: {}", r.asTypedMap())).join();
             }
         }
     }
