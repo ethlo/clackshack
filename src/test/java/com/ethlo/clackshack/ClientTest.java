@@ -135,16 +135,13 @@ public class ClientTest
             final String queryId = UUID.randomUUID().toString();
             final String query = "SELECT count() from numbers(20000000000)";
             final CompletableFuture<QueryResult> promise = client.query(query, QueryOptions.create().queryId(queryId));
-            Thread.sleep(10);
-            final CompletableFuture<Boolean> killResult = client.killQuery(queryId);
 
-            killResult.join();
-            logger.info("Killed");
+            Thread.sleep(20);
+            client.killQuery(queryId).whenComplete((r, e) -> logger.info("Kill command finished"));
 
             try
             {
-                final QueryResult result = promise.join();
-                logger.info("Query: {}", result);
+                promise.whenComplete((r, e) -> logger.info("Original query died: {} - {}", r, e)).join();
             }
             catch (CompletionException exc)
             {
