@@ -90,7 +90,7 @@ public class ClientTest
                 logger.info("{}", p);
                 progressList.add(p);
                 return true;
-            })).thenAcceptAsync(result -> logger.info("\n{}", result)).join();
+            })).thenAccept(result -> logger.info("\n{}", result)).join();
         }
 
         assertThat(progressList).isNotEmpty();
@@ -147,6 +147,31 @@ public class ClientTest
             {
                 assertThat(exc.getCause()).isInstanceOf(QueryAbortedException.class);
             }
+        }
+    }
+
+    @Test
+    public void testSelectInsertIntoProgress()
+    {
+        try (final Client client = new ClientImpl(baseUrl))
+        {
+            client.ddl("DROP TABLE IF EXISTS nums").join();
+
+            client.ddl("CREATE TABLE nums (num UInt64) " +
+                    "ENGINE = MergeTree " +
+                    "ORDER BY num " +
+                    "SETTINGS index_granularity = 8192;").join();
+
+            final List<QueryProgress> progressList = new LinkedList<>();
+            final CompletableFuture<QueryResult> promise = client.query("INSERT INTO nums SELECT * from numbers(30000000) as num", QueryOptions.create()
+                    .progressListener(p ->
+                    {
+                        logger.info("Progress: {}", p);
+                        progressList.add(p);
+                        return true;
+                    }));
+            promise.join();
+            assertThat(progressList).isNotEmpty();
         }
     }
 

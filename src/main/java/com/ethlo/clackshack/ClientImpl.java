@@ -89,6 +89,33 @@ public class ClientImpl implements Client
     }
 
     @Override
+    public CompletableFuture<Void> ddl(String ddl)
+    {
+        final Request req = client.newRequest(baseUrl)
+                .method(HttpMethod.POST)
+                .param(QUERY_PARAM, ddl);
+
+        final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
+
+        // Perform request
+        req.send(new CompletableFutureResponseListener(completable));
+        return completable.thenAccept(response ->
+        {
+            final int status = response.getStatus();
+            if (status != 200)
+            {
+                final String strContent = StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
+                final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
+                if (error.isPresent())
+                {
+                    throw ClickHouseErrorParser.handle(error.get());
+                }
+                throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
+            }
+        });
+    }
+
+    @Override
     public CompletableFuture<QueryResult> query(final String query,
                                                 final List<QueryParam> params,
                                                 final QueryOptions queryOptions)
@@ -165,7 +192,12 @@ public class ClientImpl implements Client
                 }
                 throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
             }
-            throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
+
+            if (status != 200)
+            {
+                throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
+            }
+            return QueryResult.EMPTY;
         });
     }
 

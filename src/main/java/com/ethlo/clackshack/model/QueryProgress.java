@@ -44,7 +44,7 @@ public class QueryProgress
     {
         if (getReadRows() != 0 && getTotalRowsToRead() != 0)
         {
-            return getReadRows() / (double) getTotalRowsToRead() * 100;
+            return Math.min(getReadRows() / (double) getTotalRowsToRead() * 100, 100D);
         }
         return 0;
     }

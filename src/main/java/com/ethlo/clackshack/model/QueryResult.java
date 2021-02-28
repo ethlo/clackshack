@@ -27,18 +27,21 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import com.ethlo.clackshack.TypeConversionException;
 import com.ethlo.clackshack.ClientImpl;
+import com.ethlo.clackshack.TypeConversionException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 public class QueryResult
 {
+    public static final QueryResult EMPTY = new QueryResult(Collections.emptyList(), Collections.emptyList(), new QueryStatistics(0D, 0, 0), 0, 0);
+
     private final List<MetaEntry> meta;
     private final List<Map<String, String>> queryData;
     private final QueryStatistics queryStatistics;

@@ -95,4 +95,11 @@ public interface Client extends AutoCloseable
      * Close any resources held by the client
      */
     void close();
+
+    default CompletableFuture<QueryResult> query(String query)
+    {
+        return query(query, QueryOptions.DEFAULT);
+    }
+
+    CompletableFuture<Void> ddl(String ddl);
 }
