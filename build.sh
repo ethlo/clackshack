@@ -1,0 +1,1 @@
+docker-compose up --remove-orphans --force-recreate --no-color --renew-anon-volumes --abort-on-container-exit || true

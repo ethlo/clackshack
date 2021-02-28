@@ -1,0 +1,11 @@
+version: '3.7'
+services:
+  maven:
+    volumes:
+      - '.:/usr/src/test'
+      - '${HOME}/.m2:/root/.m2'
+    working_dir: /usr/src/test
+    command: mvn install -Dsurefire.skipAfterFailureCount=1 -U
+    image: maven:3.6.3-jdk-11
+  clickhouse:
+    image: yandex/clickhouse-server

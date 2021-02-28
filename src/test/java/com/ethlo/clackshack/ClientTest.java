@@ -47,19 +47,18 @@ public class ClientTest
 {
     private static final Logger logger = LoggerFactory.getLogger(ClientTest.class);
 
-    private static final String baseUrl = "http://localhost:8123";
+    private static final String baseUrl = "http://clickhouse:8123";
 
+    @Ignore
     @Test
     public void testQueryClickHouse()
     {
         try (final Client client = new ClientImpl(baseUrl))
         {
-            final String query = "SELECT id, created, code, result FROM validations " +
-                    "where id > :id " +
-                    "and code <> :code " +
-                    "and created < :max_created " +
-                    "and result = :result " +
-                    "order by created desc limit :max";
+            final String query = "SELECT * FROM all_types " +
+                    "where t_uint32 > :uint32 " +
+                    "and t_string <> :string " +
+                    "order by t_uint32 desc limit :max";
 
             final Map<String, Object> params = Map.of(
                     "id", 0L,
