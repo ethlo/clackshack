@@ -34,6 +34,7 @@ public class CompletableFutureResponseListener extends BufferingResponseListener
 
     public CompletableFutureResponseListener(CompletableFuture<ContentResponse> completable)
     {
+        super(10 * 1024 * 1024);
         this.completable = completable;
     }
 
@@ -46,14 +47,12 @@ public class CompletableFutureResponseListener extends BufferingResponseListener
         }
         else
         {
-            final HttpContentResponse response =
-                    new HttpContentResponse(
-                            result.getResponse(),
-                            getContent(),
-                            getMediaType(),
-                            getEncoding()
-                    );
-            completable.complete(response);
+            completable.complete(new HttpContentResponse(
+                    result.getResponse(),
+                    getContent(),
+                    getMediaType(),
+                    getEncoding()
+            ));
         }
     }
 }

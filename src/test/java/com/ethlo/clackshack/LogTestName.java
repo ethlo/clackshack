@@ -20,10 +20,31 @@ package com.ethlo.clackshack;
  * #L%
  */
 
-public class DuplicateQueryIdException extends ClickHouseException
+import org.junit.rules.TestWatcher;
+import org.junit.runner.Description;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Log the currently running test.
+ *
+ * <p>Typical usage:
+ *
+ * <p>{@code @Rule public LogTestName logTestName = new LogTestName();}
+ *
+ * <p>See also:
+ * <br>{@link org.junit.Rule}
+ * <br>{@link org.junit.rules.TestWatcher}
+ */
+public class LogTestName extends TestWatcher
 {
-    public DuplicateQueryIdException(final String message)
+
+    private final static Logger log = LoggerFactory.getLogger("junit.logTestName");
+
+    @Override
+    protected void starting(Description description)
     {
-        super(216, message);
+        log.debug("Test {}", description.getMethodName());
     }
+
 }

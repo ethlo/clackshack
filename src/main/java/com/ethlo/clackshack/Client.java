@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.ethlo.clackshack.model.QueryParam;
-import com.ethlo.clackshack.model.QueryResult;
+import com.ethlo.clackshack.model.ResultSet;
 import com.ethlo.clackshack.util.QueryParams;
 
 public interface Client extends AutoCloseable
@@ -39,7 +39,7 @@ public interface Client extends AutoCloseable
      * @param queryOptions The query options for this query
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<QueryResult> query(final String query, QueryOptions queryOptions)
+    default CompletableFuture<ResultSet> query(final String query, QueryOptions queryOptions)
     {
         return query(query, Collections.emptyMap(), queryOptions);
     }
@@ -51,7 +51,7 @@ public interface Client extends AutoCloseable
      * @param params The named parameters for the query
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<QueryResult> query(final String query, final Map<String, Object> params)
+    default CompletableFuture<ResultSet> query(final String query, final Map<String, Object> params)
     {
         return query(query, QueryParams.asList(params), QueryOptions.DEFAULT);
     }
@@ -65,7 +65,7 @@ public interface Client extends AutoCloseable
      * @param queryOptions The query options for this query
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<QueryResult> query(final String query, final Map<String, Object> params, final QueryOptions queryOptions)
+    default CompletableFuture<ResultSet> query(final String query, final Map<String, Object> params, final QueryOptions queryOptions)
     {
         return query(query, QueryParams.asList(params), queryOptions);
     }
@@ -89,14 +89,14 @@ public interface Client extends AutoCloseable
      * @param params The named parameters for the query
      * @return a promise that holds the result of the query
      */
-    CompletableFuture<QueryResult> query(final String query, final List<QueryParam> params, final QueryOptions queryOptions);
+    CompletableFuture<ResultSet> query(final String query, final List<QueryParam> params, final QueryOptions queryOptions);
 
     /**
      * Close any resources held by the client
      */
     void close();
 
-    default CompletableFuture<QueryResult> query(String query)
+    default CompletableFuture<ResultSet> query(String query)
     {
         return query(query, QueryOptions.DEFAULT);
     }

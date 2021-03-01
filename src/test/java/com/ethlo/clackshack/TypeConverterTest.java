@@ -27,7 +27,7 @@ import java.time.LocalDateTime;
 
 import org.junit.Test;
 
-import com.ethlo.clackshack.model.QueryResult;
+import com.ethlo.clackshack.model.ResultSet;
 
 public class TypeConverterTest
 {
@@ -55,7 +55,7 @@ public class TypeConverterTest
     {
         try
         {
-            assertThat(QueryResult.convertType(format.type, format.input)).isEqualTo(format.expected);
+            assertThat(ResultSet.convertType(format.type, format.input)).isEqualTo(format.expected);
         }
         catch (TypeConversionException exc)
         {

@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryProgress;
 import com.ethlo.clackshack.model.QueryResult;
+import com.ethlo.clackshack.model.ResultSet;
 import com.ethlo.clackshack.util.QueryUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -95,6 +96,7 @@ public class ClientImpl implements Client
                 .method(HttpMethod.POST)
                 .param(QUERY_PARAM, ddl);
 
+
         final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
 
         // Perform request
@@ -104,7 +106,7 @@ public class ClientImpl implements Client
             final int status = response.getStatus();
             if (status != 200)
             {
-                final String strContent = StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
+                final String strContent = getString(response);
                 final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
                 if (error.isPresent())
                 {
@@ -115,10 +117,15 @@ public class ClientImpl implements Client
         });
     }
 
+    private String getString(final ContentResponse response)
+    {
+        return StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
+    }
+
     @Override
-    public CompletableFuture<QueryResult> query(final String query,
-                                                final List<QueryParam> params,
-                                                final QueryOptions queryOptions)
+    public CompletableFuture<ResultSet> query(final String query,
+                                              final List<QueryParam> params,
+                                              final QueryOptions queryOptions)
     {
         final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
         logger.debug("Running query with id {}: {}", queryId, query);
@@ -178,13 +185,14 @@ public class ClientImpl implements Client
         {
             final int status = response.getStatus();
             final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
-            final String strContent = StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
+            final String strContent = getString(response);
             if (!"".equals(strContent.trim()))
             {
                 final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
                 if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
                 {
-                    return readJson(strContent, QueryResult.class);
+                    final QueryResult jsonResult = readJson(strContent, QueryResult.class);
+                    return new ResultSet(jsonResult);
                 }
                 else if (error.isPresent())
                 {
@@ -197,7 +205,7 @@ public class ClientImpl implements Client
             {
                 throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
             }
-            return QueryResult.EMPTY;
+            return new ResultSet(QueryResult.EMPTY);
         });
     }
 

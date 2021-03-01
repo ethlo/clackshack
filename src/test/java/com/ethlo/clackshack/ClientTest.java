@@ -24,8 +24,9 @@ package com.ethlo.clackshack;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -36,43 +37,51 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ethlo.clackshack.model.QueryProgress;
-import com.ethlo.clackshack.model.QueryResult;
+import com.ethlo.clackshack.model.ResultSet;
+import com.ethlo.clackshack.model.Row;
+import com.ethlo.clackshack.util.IOUtil;
 
 public class ClientTest
 {
     private static final Logger logger = LoggerFactory.getLogger(ClientTest.class);
+    private static final String baseUrl = "http://localhost:8123";
+    @Rule
+    public LogTestName logTestName = new LogTestName();
 
-    private static final String baseUrl = "http://clickhouse:8123";
-
-    @Ignore
     @Test
-    public void testQueryClickHouse()
+    public void testQueryAllDataTypes()
     {
         try (final Client client = new ClientImpl(baseUrl))
         {
-            final String query = "SELECT * FROM all_types " +
-                    "where t_uint32 > :uint32 " +
-                    "and t_string <> :string " +
-                    "order by t_uint32 desc limit :max";
+            client.ddl("drop table data_types").join();
+            client.ddl(IOUtil.readClasspath("datatypes_table.ddl")).join();
+
+            final String query = "SELECT * FROM data_types limit :limit";
+
+            final int limit = 2_000;
 
             final Map<String, Object> params = Map.of(
-                    "id", 0L,
-                    "max", 10,
-                    "code", "abcdefasdadasd",
-                    "max_created", LocalDateTime.now(),
-                    "result", "y"
+                    "limit", limit,
+                    "string", "abcdefasdadasd"
             );
+
             client.query(query, params).thenAccept(result ->
             {
                 logger.info("\n{}", result);
-                final Object created = result.asTypedMap().get(0).get("created");
-                assertThat(created).isNotNull();
-                assertThat(created).isInstanceOf(LocalDateTime.class);
+                assertThat(result).isNotNull();
+                assertThat(result).hasSize(limit);
+
+                final Row firstRow = result.getRow(0);
+                assertThat(firstRow.get("t_ipv4")).isInstanceOf(Inet4Address.class);
+                assertThat(firstRow.get("t_ipv6")).isInstanceOf(Inet6Address.class);
+
+                assertThat(result.asMap()).hasSize(limit);
             }).join();
         }
     }
@@ -89,7 +98,7 @@ public class ClientTest
                 logger.info("{}", p);
                 progressList.add(p);
                 return true;
-            })).thenAccept(result -> logger.info("\n{}", result)).join();
+            })).thenAccept(result -> logger.info("\n{}", result.getRow(0))).join();
         }
 
         assertThat(progressList).isNotEmpty();
@@ -103,7 +112,7 @@ public class ClientTest
         {
             final AtomicInteger counter = new AtomicInteger();
             final String query = "SELECT count() from numbers(2000000000)";
-            final CompletableFuture<QueryResult> promise = client.query(query, QueryOptions.create()
+            final CompletableFuture<ResultSet> promise = client.query(query, QueryOptions.create()
                     .queryId("some-progress-query")
                     .progressListener(p ->
                     {
@@ -133,7 +142,7 @@ public class ClientTest
         {
             final String queryId = UUID.randomUUID().toString();
             final String query = "SELECT count() from numbers(20000000000)";
-            final CompletableFuture<QueryResult> promise = client.query(query, QueryOptions.create().queryId(queryId));
+            final CompletableFuture<ResultSet> promise = client.query(query, QueryOptions.create().queryId(queryId));
 
             Thread.sleep(20);
             client.killQuery(queryId).whenComplete((r, e) -> logger.info("Kill command finished"));
@@ -162,7 +171,7 @@ public class ClientTest
                     "SETTINGS index_granularity = 8192;").join();
 
             final List<QueryProgress> progressList = new LinkedList<>();
-            final CompletableFuture<QueryResult> promise = client.query("INSERT INTO nums SELECT * from numbers(30000000) as num", QueryOptions.create()
+            final CompletableFuture<ResultSet> promise = client.query("INSERT INTO nums SELECT * from numbers(30000000) as num", QueryOptions.create()
                     .progressListener(p ->
                     {
                         logger.info("Progress: {}", p);
@@ -180,19 +189,19 @@ public class ClientTest
         try (final Client client = new ClientImpl(baseUrl))
         {
             final Boolean killResult = client.killQuery(UUID.randomUUID().toString()).join();
-            logger.info("{}", killResult);
+            logger.info("Killed non-existing: {}", killResult);
         }
     }
 
-    @Test
     @Ignore
+    @Test
     public void testQueryExecutionTimeExceeded()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
         try (final Client client = new ClientImpl(baseUrl))
         {
             final String query = "SELECT count() from numbers(2000000000)";
-            final CompletableFuture<QueryResult> promise = client.query(query, QueryOptions.create()
+            final CompletableFuture<ResultSet> promise = client.query(query, QueryOptions.create()
                     .maxExecutionTime(Duration.ofSeconds(1))
                     .progressListener(p ->
                     {
@@ -252,13 +261,13 @@ public class ClientTest
             final String queryId = UUID.randomUUID().toString();
 
             final String query = "SELECT count() from numbers(1000000000)";
-            final CompletableFuture<QueryResult> original = client.query(query, QueryOptions.create()
+            final CompletableFuture<ResultSet> original = client.query(query, QueryOptions.create()
                     .queryId(queryId)
                     .progressListener(QueryProgressListener.LOGGER));
             Thread.sleep(50);
 
             // Same query again, with same id
-            final QueryResult replacement = client.query(query, QueryOptions.create()
+            final ResultSet replacement = client.query(query, QueryOptions.create()
                     .queryId(queryId)
                     .replaceQuery(true)
             ).join();
