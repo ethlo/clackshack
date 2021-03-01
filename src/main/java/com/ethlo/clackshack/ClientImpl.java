@@ -168,7 +168,7 @@ public class ClientImpl implements Client
             // Send final notification when done
             if (!killedMarker.get())
             {
-                completable.whenCompleteAsync((res, exc) -> Optional.ofNullable(max.get()).ifPresent(m -> queryProgressListener.progress(new QueryProgress(m, 0, m))));
+                completable.whenComplete((res, exc) -> Optional.ofNullable(max.get()).ifPresent(m -> queryProgressListener.progress(new QueryProgress(m, 0, m))));
             }
         }
 
@@ -192,6 +192,9 @@ public class ClientImpl implements Client
                 if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
                 {
                     final QueryResult jsonResult = readJson(strContent, QueryResult.class);
+                    final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
+                    final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
+                    queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
                     return new ResultSet(jsonResult);
                 }
                 else if (error.isPresent())
