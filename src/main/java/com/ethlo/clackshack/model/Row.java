@@ -87,6 +87,6 @@ public class Row
 
     public Map<String, Object> asMap()
     {
-        return Collections.unmodifiableMap(delegate);
+        return delegate;
     }
 }
