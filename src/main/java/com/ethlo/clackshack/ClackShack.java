@@ -30,7 +30,7 @@ import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.ResultSet;
 import com.ethlo.clackshack.util.QueryParams;
 
-public interface Client extends AutoCloseable
+public interface ClackShack extends AutoCloseable
 {
     /**
      * Parameterized query method with progress  listener
@@ -102,4 +102,21 @@ public interface Client extends AutoCloseable
     }
 
     CompletableFuture<Void> ddl(String ddl);
+
+    default CompletableFuture<Void> insert(String query)
+    {
+        return insert(query, Collections.emptyMap(), QueryOptions.DEFAULT);
+    }
+
+    default CompletableFuture<Void> insert(String sql, final Map<String, Object> params)
+    {
+        return insert(sql, params, QueryOptions.DEFAULT);
+    }
+
+    CompletableFuture<Void> insert(String sql, final Map<String, Object> params, final QueryOptions queryOptions);
+
+    default CompletableFuture<Void> insert(final String sql, final QueryOptions queryOptions)
+    {
+        return insert(sql, Collections.emptyMap(), queryOptions);
+    }
 }

@@ -20,7 +20,7 @@
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-client</artifactId>
+            <artifactId>jetty-clackShack</artifactId>
             <version>9.4.35.v20201120</version>
         </dependency>
         <dependency>

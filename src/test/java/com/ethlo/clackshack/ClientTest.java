@@ -57,10 +57,10 @@ public class ClientTest
     @Test
     public void testQueryAllDataTypes()
     {
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
-            client.ddl("drop table data_types").join();
-            client.ddl(IOUtil.readClasspath("datatypes_table.ddl")).join();
+            clackShack.ddl("drop table data_types").join();
+            clackShack.ddl(IOUtil.readClasspath("datatypes_table.ddl")).join();
 
             final String query = "SELECT * FROM data_types limit :limit";
 
@@ -71,7 +71,7 @@ public class ClientTest
                     "string", "abcdefasdadasd"
             );
 
-            client.query(query, params).thenAccept(result ->
+            clackShack.query(query, params).thenAccept(result ->
             {
                 logger.info("\n{}", result);
                 assertThat(result).isNotNull();
@@ -90,10 +90,10 @@ public class ClientTest
     public void testQueryProgress()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final String query = "SELECT count() from numbers(2000000000)";
-            client.query(query, QueryOptions.create().progressListener(p ->
+            clackShack.query(query, QueryOptions.create().progressListener(p ->
             {
                 logger.info("{}", p);
                 progressList.add(p);
@@ -108,11 +108,11 @@ public class ClientTest
     public void testQueryProgressAbort()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final AtomicInteger counter = new AtomicInteger();
             final String query = "SELECT count() from numbers(2000000000)";
-            final CompletableFuture<ResultSet> promise = client.query(query, QueryOptions.create()
+            final CompletableFuture<ResultSet> promise = clackShack.query(query, QueryOptions.create()
                     .queryId("some-progress-query")
                     .progressListener(p ->
                     {
@@ -138,14 +138,14 @@ public class ClientTest
     @Test
     public void testKillExisting() throws InterruptedException
     {
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final String queryId = UUID.randomUUID().toString();
             final String query = "SELECT count() from numbers(20000000000)";
-            final CompletableFuture<ResultSet> promise = client.query(query, QueryOptions.create().queryId(queryId));
+            final CompletableFuture<ResultSet> promise = clackShack.query(query, QueryOptions.create().queryId(queryId));
 
             Thread.sleep(20);
-            client.killQuery(queryId).whenComplete((r, e) -> logger.info("Kill command finished"));
+            clackShack.killQuery(queryId).whenComplete((r, e) -> logger.info("Kill command finished"));
 
             try
             {
@@ -161,17 +161,17 @@ public class ClientTest
     @Test
     public void testSelectInsertIntoProgress()
     {
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
-            client.ddl("DROP TABLE IF EXISTS nums").join();
+            clackShack.ddl("DROP TABLE IF EXISTS nums").join();
 
-            client.ddl("CREATE TABLE nums (num UInt64) " +
+            clackShack.ddl("CREATE TABLE nums (num UInt64) " +
                     "ENGINE = MergeTree " +
                     "ORDER BY num " +
-                    "SETTINGS index_granularity = 8192;").join();
+                    "SETTINGS index_granularity = 8192").join();
 
             final List<QueryProgress> progressList = new LinkedList<>();
-            final CompletableFuture<ResultSet> promise = client.query("INSERT INTO nums SELECT * from numbers(30000000) as num", QueryOptions.create()
+            final CompletableFuture<Void> promise = clackShack.insert("INSERT INTO nums SELECT * from numbers(30000000) as num", QueryOptions.create()
                     .progressListener(p ->
                     {
                         logger.info("Progress: {}", p);
@@ -186,9 +186,9 @@ public class ClientTest
     @Test
     public void testKillNonExisting()
     {
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
-            final Boolean killResult = client.killQuery(UUID.randomUUID().toString()).join();
+            final Boolean killResult = clackShack.killQuery(UUID.randomUUID().toString()).join();
             logger.info("Killed non-existing: {}", killResult);
         }
     }
@@ -198,10 +198,10 @@ public class ClientTest
     public void testQueryExecutionTimeExceeded()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final String query = "SELECT count() from numbers(2000000000)";
-            final CompletableFuture<ResultSet> promise = client.query(query, QueryOptions.create()
+            final CompletableFuture<ResultSet> promise = clackShack.query(query, QueryOptions.create()
                     .maxExecutionTime(Duration.ofSeconds(1))
                     .progressListener(p ->
                     {
@@ -227,19 +227,19 @@ public class ClientTest
     @Test
     public void testSameQueryIdShouldThrow() throws InterruptedException
     {
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final String queryId = UUID.randomUUID().toString();
             final QueryOptions options = QueryOptions.create().queryId(queryId);
 
             final String query = "SELECT count() from numbers(10000000000)";
-            client.query(query, options).thenAccept(result -> logger.info("\n{}", result));
+            clackShack.query(query, options).thenAccept(result -> logger.info("\n{}", result));
             Thread.sleep(10);
 
             // Same query again, with same id
             try
             {
-                client.query(query, options).thenAccept(result -> logger.info("\n{}", result)).get();
+                clackShack.query(query, options).thenAccept(result -> logger.info("\n{}", result)).get();
                 fail("Should fail as the same query id already is in progress");
             }
             catch (ExecutionException expected)
@@ -247,7 +247,7 @@ public class ClientTest
                 assertThat(expected.getCause()).isInstanceOf(DuplicateQueryIdException.class);
 
                 // Kill the initial query to avoid having to wait for it
-                final CompletableFuture<Boolean> killResult = client.killQuery(queryId);
+                final CompletableFuture<Boolean> killResult = clackShack.killQuery(queryId);
                 killResult.thenAccept(r -> logger.info("Kill result: {}", r)).join();
             }
         }
@@ -256,18 +256,18 @@ public class ClientTest
     @Test
     public void testSameQueryIdShouldReplace() throws InterruptedException
     {
-        try (final Client client = new ClientImpl(baseUrl))
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final String queryId = UUID.randomUUID().toString();
 
             final String query = "SELECT count() from numbers(1000000000)";
-            final CompletableFuture<ResultSet> original = client.query(query, QueryOptions.create()
+            final CompletableFuture<ResultSet> original = clackShack.query(query, QueryOptions.create()
                     .queryId(queryId)
                     .progressListener(QueryProgressListener.LOGGER));
             Thread.sleep(50);
 
             // Same query again, with same id
-            final ResultSet replacement = client.query(query, QueryOptions.create()
+            final ResultSet replacement = clackShack.query(query, QueryOptions.create()
                     .queryId(queryId)
                     .replaceQuery(true)
             ).join();

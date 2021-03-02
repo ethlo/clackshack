@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.ethlo.clackshack.ClientImpl;
+import com.ethlo.clackshack.ClackShackImpl;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -78,7 +78,7 @@ public class QueryResult
     {
         try
         {
-            return ClientImpl.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+            return ClackShackImpl.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(this);
         }
         catch (JsonProcessingException e)
         {

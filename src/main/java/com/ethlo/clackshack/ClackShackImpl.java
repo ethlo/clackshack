@@ -26,7 +26,9 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,12 +47,13 @@ import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.QueryProgress;
 import com.ethlo.clackshack.model.QueryResult;
 import com.ethlo.clackshack.model.ResultSet;
+import com.ethlo.clackshack.util.QueryParams;
 import com.ethlo.clackshack.util.QueryUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-public class ClientImpl implements Client
+public class ClackShackImpl implements ClackShack
 {
     public static final ObjectMapper mapper = new ObjectMapper();
     public static final String CLICK_HOUSE_PROGRESS_HEADER_NAME = "X-ClickHouse-Progress";
@@ -62,7 +65,7 @@ public class ClientImpl implements Client
     public static final String PARAM_PREFIX = "param_";
     public static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     public static final String APPLICATION_JSON_CONTENT_TYPE = "application/json";
-    private static final Logger logger = LoggerFactory.getLogger(ClientImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(ClackShackImpl.class);
     private static final String MAX_EXECUTION_TIME_PARAM = "max_execution_time";
 
     static
@@ -74,7 +77,7 @@ public class ClientImpl implements Client
     private final String baseUrl;
     private final HttpClient client;
 
-    public ClientImpl(String baseUrl)
+    public ClackShackImpl(String baseUrl)
     {
         this.baseUrl = baseUrl;
         this.client = new HttpClient();
@@ -92,15 +95,12 @@ public class ClientImpl implements Client
     @Override
     public CompletableFuture<Void> ddl(String ddl)
     {
-        final Request req = client.newRequest(baseUrl)
-                .method(HttpMethod.POST)
-                .param(QUERY_PARAM, ddl);
+        return handleDataMutating(ddl, Collections.emptyMap(), QueryOptions.DEFAULT);
+    }
 
-
-        final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
-
-        // Perform request
-        req.send(new CompletableFutureResponseListener(completable));
+    private CompletableFuture<Void> handleDataMutating(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
+    {
+        final CompletableFuture<ContentResponse> completable = sendRequest(sql, QueryParams.asList(params), queryOptions);
         return completable.thenAccept(response ->
         {
             final int status = response.getStatus();
@@ -117,6 +117,12 @@ public class ClientImpl implements Client
         });
     }
 
+    @Override
+    public CompletableFuture<Void> insert(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
+    {
+        return handleDataMutating(sql, params, queryOptions);
+    }
+
     private String getString(final ContentResponse response)
     {
         return StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
@@ -126,6 +132,42 @@ public class ClientImpl implements Client
     public CompletableFuture<ResultSet> query(final String query,
                                               final List<QueryParam> params,
                                               final QueryOptions queryOptions)
+    {
+        final CompletableFuture<ContentResponse> completable = sendRequest(query, params, queryOptions);
+
+        // Process response
+        return completable.thenApplyAsync(response ->
+        {
+            final int status = response.getStatus();
+            final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
+            final String strContent = getString(response);
+            if (!"".equals(strContent.trim()))
+            {
+                final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
+                if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
+                {
+                    final QueryResult jsonResult = readJson(strContent, QueryResult.class);
+                    final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
+                    final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
+                    queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
+                    return new ResultSet(jsonResult);
+                }
+                else if (error.isPresent())
+                {
+                    throw ClickHouseErrorParser.handle(error.get());
+                }
+                throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
+            }
+
+            if (status != 200)
+            {
+                throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
+            }
+            return new ResultSet(QueryResult.EMPTY);
+        });
+    }
+
+    private CompletableFuture<ContentResponse> sendRequest(final String query, final List<QueryParam> params, final QueryOptions queryOptions)
     {
         final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
         logger.debug("Running query with id {}: {}", queryId, query);
@@ -179,37 +221,7 @@ public class ClientImpl implements Client
 
         // Perform request
         req.send(new CompletableFutureResponseListener(completable));
-
-        // Process response
-        return completable.thenApplyAsync(response ->
-        {
-            final int status = response.getStatus();
-            final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
-            final String strContent = getString(response);
-            if (!"".equals(strContent.trim()))
-            {
-                final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
-                if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
-                {
-                    final QueryResult jsonResult = readJson(strContent, QueryResult.class);
-                    final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
-                    final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
-                    queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
-                    return new ResultSet(jsonResult);
-                }
-                else if (error.isPresent())
-                {
-                    throw ClickHouseErrorParser.handle(error.get());
-                }
-                throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
-            }
-
-            if (status != 200)
-            {
-                throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
-            }
-            return new ResultSet(QueryResult.EMPTY);
-        });
+        return completable;
     }
 
     @Override

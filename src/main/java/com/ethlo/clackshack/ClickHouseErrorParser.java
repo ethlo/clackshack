@@ -28,10 +28,10 @@ import java.util.regex.Pattern;
 public class ClickHouseErrorParser
 {
     private static final String regexp = "^Code: ([0-9]+).*DB::Exception: (.*)\\(version";
+    private static final Pattern pattern = Pattern.compile(regexp, Pattern.CASE_INSENSITIVE | Pattern.DOTALL | Pattern.MULTILINE);
 
     public static Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> parseError(final String strContent)
     {
-        final Pattern pattern = Pattern.compile(regexp);
         final Matcher matcher = pattern.matcher(strContent);
         if (matcher.find())
         {
