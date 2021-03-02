@@ -133,6 +133,8 @@ public class ClackShackImpl implements ClackShack
                                               final List<QueryParam> params,
                                               final QueryOptions queryOptions)
     {
+        final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
+        queryProgressListener.progress(new QueryProgress(0, 0, 0));
         final CompletableFuture<ContentResponse> completable = sendRequest(query, params, queryOptions);
 
         // Process response
@@ -147,7 +149,6 @@ public class ClackShackImpl implements ClackShack
                 if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
                 {
                     final QueryResult jsonResult = readJson(strContent, QueryResult.class);
-                    final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
                     final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
                     queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
                     return new ResultSet(jsonResult);
