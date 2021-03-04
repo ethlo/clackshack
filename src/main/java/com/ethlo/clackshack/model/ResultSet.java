@@ -20,21 +20,12 @@ package com.ethlo.clackshack.model;
  * #L%
  */
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Spliterator;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,70 +68,15 @@ public class ResultSet implements Iterable<Row>
         final String baseType = stripParameters(nullableStripped);
 
         logger.trace("Type: {}", baseType);
-        switch (baseType)
+        final DataTypes.DataType<?> type = DataTypes.match(baseType).orElseThrow(() -> new IllegalArgumentException("Unknown type: " + baseType));
+        try
         {
-            case "UInt8":
-            case "Int8":
-                return Short.valueOf(value);
-            case "UInt16":
-            case "Int16":
-                return Integer.valueOf(value);
-            case "UInt32":
-            case "Int32":
-                return Long.valueOf(value);
-            case "UInt64":
-            case "Int64":
-                return new BigInteger(value);
-            case "IPv4":
-            case "IPv6":
-                try
-                {
-                    return InetAddress.getByName(value);
-                }
-                catch (UnknownHostException e)
-                {
-                    throw new IllegalArgumentException(e);
-                }
-            case "DateTime64":
-                try
-                {
-                    return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
-                }
-                catch (DateTimeParseException exc)
-                {
-                    throw new TypeConversionException("DateTime64", value, LocalDateTime.class, exc);
-                }
-            case "DateTime":
-                try
-                {
-                    return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                }
-                catch (DateTimeParseException exc)
-                {
-                    throw new TypeConversionException("DateTime", value, LocalDateTime.class, exc);
-                }
-            case "Date":
-                try
-                {
-                    return LocalDate.parse(value);
-                }
-                catch (DateTimeParseException exc)
-                {
-                    throw new TypeConversionException("Date", value, LocalDate.class, exc);
-                }
-            case "UUID":
-                return UUID.fromString(value);
-            case "Float32":
-                return Float.parseFloat(value);
-            case "Float64":
-                return Double.parseDouble(value);
-            case "Decimal":
-            case "Decimal32":
-            case "Decimal64":
-                return new BigDecimal(value);
+            return type.getParser().apply(value);
         }
-
-        return value;
+        catch (Exception exc)
+        {
+            throw new TypeConversionException(type.getName(), value, type.getType(), exc);
+        }
     }
 
     private static String stripParameters(final String nullableStripped)
