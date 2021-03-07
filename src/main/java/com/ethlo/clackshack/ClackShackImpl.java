@@ -81,7 +81,7 @@ public class ClackShackImpl implements ClackShack
     {
         this.baseUrl = baseUrl;
         this.client = new HttpClient();
-        this.client.setName("ch-client");
+        this.client.setName("clackshack");
         try
         {
             client.start();
@@ -211,7 +211,10 @@ public class ClackShackImpl implements ClackShack
             // Send final notification when done
             if (!killedMarker.get())
             {
-                completable.whenComplete((res, exc) -> Optional.ofNullable(max.get()).ifPresent(m -> queryProgressListener.progress(new QueryProgress(m, 0, m))));
+                completable
+                        .whenComplete((res, exc) -> Optional.ofNullable(max.get()).filter(m -> m > 0)
+                                .ifPresent(m -> queryProgressListener
+                                        .progress(new QueryProgress(m, 0, m))));
             }
         }
 
