@@ -57,6 +57,7 @@ public class ClackShackImpl implements ClackShack
 {
     public static final ObjectMapper mapper = new ObjectMapper();
     public static final String CLICK_HOUSE_PROGRESS_HEADER_NAME = "X-ClickHouse-Progress";
+    public static final String CLICK_HOUSE_SUMMARY_HEADER_NAME = "X-ClickHouse-Summary";
     public static final String WAIT_END_OF_QUERY_PARAM = "wait_end_of_query";
     public static final String SEND_PROGRESS_IN_HTTP_HEADERS_PARAM = "send_progress_in_http_headers";
     public static final String QUERY_PARAM = "query";
@@ -212,9 +213,10 @@ public class ClackShackImpl implements ClackShack
             if (!killedMarker.get())
             {
                 completable
-                        .whenComplete((res, exc) -> Optional.ofNullable(max.get()).filter(m -> m > 0)
-                                .ifPresent(m -> queryProgressListener
-                                        .progress(new QueryProgress(m, 0, m))));
+                        .whenComplete((res, exc) -> Optional.ofNullable(res.getHeaders().get(CLICK_HOUSE_SUMMARY_HEADER_NAME))
+                                .map(summary -> readJson(summary, QueryProgress.class))
+                                .ifPresent(summary -> queryProgressListener
+                                        .progress(new QueryProgress(summary.getReadRows(), summary.getReadBytes(), summary.getTotalRowsToRead()))));
             }
         }
 
