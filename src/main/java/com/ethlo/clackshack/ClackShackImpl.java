@@ -147,7 +147,7 @@ public class ClackShackImpl implements ClackShack
             if (!"".equals(strContent.trim()))
             {
                 final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
-                if (!error.isPresent() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
+                if (error.isEmpty() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
                 {
                     final QueryResult jsonResult = readJson(strContent, QueryResult.class);
                     final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
