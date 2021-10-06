@@ -9,9 +9,9 @@ package com.ethlo.clackshack.model;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -77,6 +77,10 @@ public class DataTypes
             new DataType<>("DateTime64", LocalDateTime.class, value ->
                     LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
             );
+
+    public static final DataType<String> ENUM = new DataType<>("Enum", String.class, value -> value);
+    public static final DataType<String> ENUM_8 = new DataType<>("Enum8", String.class, value -> value);
+    public static final DataType<String> ENUM_16 = new DataType<>("Enum16", String.class, value -> value);
 
     public static final DataType<LocalDateTime> DATE_TIME =
             new DataType<>("DateTime", LocalDateTime.class, value ->

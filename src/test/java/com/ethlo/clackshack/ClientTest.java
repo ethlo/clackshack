@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.fail;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -155,6 +156,19 @@ public class ClientTest
             {
                 assertThat(exc.getCause()).isInstanceOf(QueryAbortedException.class);
             }
+        }
+    }
+
+    @Test
+    public void testInsert()
+    {
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
+        {
+            clackShack.ddl("CREATE TABLE IF NOT EXISTS insert_me (id UInt32, message String) ENGINE = MergeTree ORDER BY id").join();
+            final Map<String, Object> params = new LinkedHashMap<>();
+            params.put("id", 123);
+            params.put("message", "Hello world");
+            clackShack.insert("INSERT INTO insert_me VALUES (:id, :message)", params).join();
         }
     }
 

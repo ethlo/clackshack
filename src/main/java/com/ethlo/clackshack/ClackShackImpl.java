@@ -26,7 +26,6 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,6 +39,7 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,12 +62,14 @@ public class ClackShackImpl implements ClackShack
     public static final String SEND_PROGRESS_IN_HTTP_HEADERS_PARAM = "send_progress_in_http_headers";
     public static final String QUERY_PARAM = "query";
     public static final String QUERY_ID_PARAM = "query_id";
+    public static final String QUERY_DEFAULT_FORMAT = "default_format";
     public static final String REPLACE_RUNNING_QUERY_PARAM = "replace_running_query";
     public static final String PARAM_PREFIX = "param_";
     public static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     public static final String APPLICATION_JSON_CONTENT_TYPE = "application/json";
+    public static final String MAX_EXECUTION_TIME_PARAM = "max_execution_time";
+
     private static final Logger logger = LoggerFactory.getLogger(ClackShackImpl.class);
-    private static final String MAX_EXECUTION_TIME_PARAM = "max_execution_time";
 
     static
     {
@@ -96,7 +98,7 @@ public class ClackShackImpl implements ClackShack
     @Override
     public CompletableFuture<Void> ddl(String ddl)
     {
-        return handleDataMutating(ddl, Collections.emptyMap(), QueryOptions.DEFAULT);
+        return handleDataMutating(ddl, null, QueryOptions.DEFAULT);
     }
 
     private CompletableFuture<Void> handleDataMutating(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
@@ -105,7 +107,7 @@ public class ClackShackImpl implements ClackShack
         return completable.thenAccept(response ->
         {
             final int status = response.getStatus();
-            if (status != 200)
+            if (status != HttpStatus.OK_200)
             {
                 final String strContent = getString(response);
                 final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
@@ -161,7 +163,7 @@ public class ClackShackImpl implements ClackShack
                 throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
             }
 
-            if (status != 200)
+            if (status != HttpStatus.OK_200)
             {
                 throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
             }
@@ -172,16 +174,16 @@ public class ClackShackImpl implements ClackShack
     private CompletableFuture<ContentResponse> sendRequest(final String query, final List<QueryParam> params, final QueryOptions queryOptions)
     {
         final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
-        logger.debug("Running query with id {}: {}", queryId, query);
-
-        final String rewritten = QueryUtil.format(query, params);
+        final String q = params != null ? QueryUtil.format(query, params) : query;
+        logger.debug("Running query with id {}: {}", queryId, q);
         final AtomicBoolean killedMarker = new AtomicBoolean(false);
         final AtomicReference<Long> max = new AtomicReference<>();
         final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
 
         final Request req = client.newRequest(baseUrl)
                 .method(HttpMethod.POST)
-                .param(QUERY_PARAM, rewritten + " format JSON")
+                .param(QUERY_DEFAULT_FORMAT, "JSON")
+                .param(QUERY_PARAM, q)
                 .param(QUERY_ID_PARAM, Objects.requireNonNull(queryId, "queryId must not be null"))
                 .param(REPLACE_RUNNING_QUERY_PARAM, queryOptions.replaceQuery() ? "1" : "0");
 
@@ -223,7 +225,7 @@ public class ClackShackImpl implements ClackShack
         // Enable max query time
         queryOptions.maxExecutionTime().ifPresent(duration -> req.param(MAX_EXECUTION_TIME_PARAM, Long.toString(duration.toSeconds())));
 
-        params.forEach((param) -> req.param(PARAM_PREFIX + param.getName(), param.getValue().toString()));
+        Optional.ofNullable(params).ifPresent(p -> p.forEach(param -> req.param(PARAM_PREFIX + param.getName(), Optional.ofNullable(param.getValue()).map(Object::toString).orElse(null))));
 
         // Perform request
         req.send(new CompletableFutureResponseListener(completable));

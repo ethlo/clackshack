@@ -30,8 +30,13 @@ import com.ethlo.clackshack.model.QueryParam;
 
 public class QueryParams
 {
-    private static QueryParam of(String name, Object value)
+    public static QueryParam of(String name, Object value)
     {
+        if (value == null)
+        {
+            throw new IllegalArgumentException("Cannot handle null as it is impossible to infer the data type for parameter '" + name + "'");
+        }
+
         final Class<?> type = value.getClass();
         if (type == Boolean.class)
         {
@@ -74,10 +79,15 @@ public class QueryParams
 
     public static List<QueryParam> asList(final Map<String, Object> params)
     {
+        if (params == null)
+        {
+            return null;
+        }
+
         final List<QueryParam> paramList = new LinkedList<>();
         for (final Map.Entry<String, Object> p : params.entrySet())
         {
-            paramList.add(QueryParams.of(p.getKey(), p.getValue()));
+            paramList.add(of(p.getKey(), p.getValue()));
         }
         return paramList;
     }

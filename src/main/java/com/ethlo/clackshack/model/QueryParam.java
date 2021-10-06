@@ -38,6 +38,13 @@ public class QueryParam
         this.value = Objects.requireNonNull(value, "value cannot be null");
     }
 
+    public QueryParam(final String name, final String type)
+    {
+        this.name = Objects.requireNonNull(name, "name cannot be null");
+        this.type = Objects.requireNonNull(type, "type cannot be null");
+        this.value = null;
+    }
+
     public static QueryParam of(final String name, final byte value)
     {
         return new QueryParam(name, "Int8", value);
@@ -81,6 +88,11 @@ public class QueryParam
     public static QueryParam of(final String name, final LocalDateTime dateTime)
     {
         return new QueryParam(name, "String", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss").format(dateTime));
+    }
+
+    public static QueryParam ofNull(String name, String type)
+    {
+        return new QueryParam(name, type);
     }
 
     public String getName()

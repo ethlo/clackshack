@@ -38,8 +38,8 @@ public class QueryUtil
 
         while (matcher.find())
         {
-            String key = matcher.group(1);
-            String formatKey = String.format(":%s", key);
+            final String key = matcher.group(1);
+            final String formatKey = String.format(":%s", key);
             final int index = formatter.indexOf(formatKey);
 
             if (index != -1)
