@@ -188,6 +188,7 @@ public class ClackShackImpl implements ClackShack
                 .param(REPLACE_RUNNING_QUERY_PARAM, queryOptions.replaceQuery() ? "1" : "0");
 
         // Enable progress headers
+        final AtomicReference<QueryProgress> lastSentProgress = new AtomicReference<>();
         if (queryOptions.progressListener().isPresent())
         {
             final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
@@ -196,14 +197,19 @@ public class ClackShackImpl implements ClackShack
                 if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
                 {
                     final QueryProgress progress = readJson(httpField.getValue(), QueryProgress.class);
-                    max.set(progress.getTotalRowsToRead());
-                    final boolean continueProcessing = queryProgressListener.progress(progress);
-                    if (!continueProcessing && !killedMarker.get())
+
+                    if (!progress.equals(lastSentProgress.get()))
                     {
-                        logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
-                        killQuery(queryId).thenAccept(result -> logger.info("Killed {}", result));
-                        killedMarker.set(true);
-                        completable.completeExceptionally(new QueryAbortedException());
+                        lastSentProgress.set(progress);
+                        max.set(progress.getTotalRowsToRead());
+                        final boolean continueProcessing = queryProgressListener.progress(progress);
+                        if (!continueProcessing && !killedMarker.get())
+                        {
+                            logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
+                            killQuery(queryId).thenAccept(result -> logger.info("Killed {}", result));
+                            killedMarker.set(true);
+                            completable.completeExceptionally(new QueryAbortedException());
+                        }
                     }
                 }
                 return true;
@@ -217,8 +223,14 @@ public class ClackShackImpl implements ClackShack
                 completable
                         .whenComplete((res, exc) -> Optional.ofNullable(res.getHeaders().get(CLICK_HOUSE_SUMMARY_HEADER_NAME))
                                 .map(summary -> readJson(summary, QueryProgress.class))
-                                .ifPresent(summary -> queryProgressListener
-                                        .progress(new QueryProgress(summary.getReadRows(), summary.getReadBytes(), summary.getTotalRowsToRead()))));
+                                .ifPresent(summary ->
+                                {
+                                    final QueryProgress finalProgress = new QueryProgress(summary.getReadRows(), summary.getReadBytes(), summary.getTotalRowsToRead());
+                                    if (!finalProgress.equals(lastSentProgress.get()))
+                                    {
+                                        queryProgressListener.progress(finalProgress);
+                                    }
+                                }));
             }
         }
 
