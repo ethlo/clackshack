@@ -60,7 +60,7 @@ public class ClientTest
     {
         try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
-            clackShack.ddl("drop table data_types").join();
+            clackShack.ddl("drop table if exists data_types").join();
             clackShack.ddl(IOUtil.readClasspath("datatypes_table.ddl")).join();
 
             final String query = "SELECT * FROM data_types limit :limit";
