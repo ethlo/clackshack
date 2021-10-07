@@ -2,6 +2,9 @@ language: java
 jdk:
   - openjdk11
 
+services:
+  - clickhouse
+
 cache:
   directories:
     - "$HOME/.m2/repository"
