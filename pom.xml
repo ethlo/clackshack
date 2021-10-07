@@ -9,7 +9,7 @@
     <name>ClackShack</name>
     <url>https://github.com/ethlo/clackshack</url>
     <description>Unofficial ClickHouse HTTP query interface client. Super light-weight asynchronous (CompletableFuture) modern API</description>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.1</version>
     <dependencies>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
