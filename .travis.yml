@@ -3,7 +3,11 @@ jdk:
   - openjdk11
 
 services:
-  - clickhouse
+  - docker
+
+before_install:
+  - docker pull yandex/clickhouse-server
+  - docker run -d --name some-clickhouse-server -p 8123:8123 --ulimit nofile=262144:262144 yandex/clickhouse-server
 
 cache:
   directories:
