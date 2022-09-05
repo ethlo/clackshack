@@ -6,7 +6,7 @@
 [![Build Status](https://app.travis-ci.com/ethlo/clackshack.svg?branch=main)](https://app.travis-ci.com/ethlo/clackshack)
 [![GitHub issues open](https://img.shields.io/github/issues/ethlo/clackshack.svg)](https://github.com/ethlo/jsons2xsd/issues)
 
-Unofficial ClickHouse HTTP query interface client. Super light-weight asynchronous (CompletableFuture) modern API.
+Unofficial ClickHouse HTTP query interface client.
 
 ## Main features
 * Easy to use

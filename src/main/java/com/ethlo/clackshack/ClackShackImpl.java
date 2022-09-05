@@ -31,7 +31,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -96,34 +97,31 @@ public class ClackShackImpl implements ClackShack
     }
 
     @Override
-    public CompletableFuture<Void> ddl(String ddl)
+    public void ddl(String ddl)
     {
-        return handleDataMutating(ddl, null, QueryOptions.DEFAULT);
+        handleDataMutating(ddl, null, QueryOptions.DEFAULT);
     }
 
-    private CompletableFuture<Void> handleDataMutating(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
+    private void handleDataMutating(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
     {
-        final CompletableFuture<ContentResponse> completable = sendRequest(sql, QueryParams.asList(params), queryOptions);
-        return completable.thenAccept(response ->
+        final ContentResponse response = sendRequest(sql, QueryParams.asList(params), queryOptions);
+        final int status = response.getStatus();
+        if (status != HttpStatus.OK_200)
         {
-            final int status = response.getStatus();
-            if (status != HttpStatus.OK_200)
+            final String strContent = getString(response);
+            final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
+            if (error.isPresent())
             {
-                final String strContent = getString(response);
-                final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
-                if (error.isPresent())
-                {
-                    throw ClickHouseErrorParser.handle(error.get());
-                }
-                throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
+                throw ClickHouseErrorParser.handle(error.get());
             }
-        });
+            throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
+        }
     }
 
     @Override
-    public CompletableFuture<Void> insert(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
+    public void insert(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
     {
-        return handleDataMutating(sql, params, queryOptions);
+        handleDataMutating(sql, params, queryOptions);
     }
 
     private String getString(final ContentResponse response)
@@ -132,53 +130,48 @@ public class ClackShackImpl implements ClackShack
     }
 
     @Override
-    public CompletableFuture<ResultSet> query(final String query,
-                                              final List<QueryParam> params,
-                                              final QueryOptions queryOptions)
+    public ResultSet query(final String query,
+                           final List<QueryParam> params,
+                           final QueryOptions queryOptions)
     {
         final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
         queryProgressListener.progress(new QueryProgress(0, 0, 0));
-        final CompletableFuture<ContentResponse> completable = sendRequest(query, params, queryOptions);
+        final ContentResponse response = sendRequest(query, params, queryOptions);
 
         // Process response
-        return completable.thenApplyAsync(response ->
+        final int status = response.getStatus();
+        final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
+        final String strContent = getString(response);
+        if (!"".equals(strContent.trim()))
         {
-            final int status = response.getStatus();
-            final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
-            final String strContent = getString(response);
-            if (!"".equals(strContent.trim()))
+            final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
+            if (error.isEmpty() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
             {
-                final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
-                if (error.isEmpty() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
-                {
-                    final QueryResult jsonResult = readJson(strContent, QueryResult.class);
-                    final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
-                    queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
-                    return new ResultSet(jsonResult);
-                }
-                else if (error.isPresent())
-                {
-                    throw ClickHouseErrorParser.handle(error.get());
-                }
-                throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
+                final QueryResult jsonResult = readJson(strContent, QueryResult.class);
+                final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
+                queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
+                return new ResultSet(jsonResult);
             }
+            else if (error.isPresent())
+            {
+                throw ClickHouseErrorParser.handle(error.get());
+            }
+            throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
+        }
 
-            if (status != HttpStatus.OK_200)
-            {
-                throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
-            }
-            return new ResultSet(QueryResult.EMPTY);
-        });
+        if (status != HttpStatus.OK_200)
+        {
+            throw new UncheckedIOException(new IOException("No body content in response: " + status + " - " + strContent));
+        }
+        return new ResultSet(QueryResult.EMPTY);
     }
 
-    private CompletableFuture<ContentResponse> sendRequest(final String query, final List<QueryParam> params, final QueryOptions queryOptions)
+    private ContentResponse sendRequest(final String query, final List<QueryParam> params, final QueryOptions queryOptions)
     {
         final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
         final String q = params != null ? QueryUtil.format(query, params) : query;
         logger.debug("Running query with id {}: {}", queryId, q);
         final AtomicBoolean killedMarker = new AtomicBoolean(false);
-        final AtomicReference<Long> max = new AtomicReference<>();
-        final CompletableFuture<ContentResponse> completable = new CompletableFuture<>();
 
         final Request req = client.newRequest(baseUrl)
                 .method(HttpMethod.POST)
@@ -189,9 +182,9 @@ public class ClackShackImpl implements ClackShack
 
         // Enable progress headers
         final AtomicReference<QueryProgress> lastSentProgress = new AtomicReference<>();
+        final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
         if (queryOptions.progressListener().isPresent())
         {
-            final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
             req.onResponseHeader((response, httpField) ->
             {
                 if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
@@ -201,14 +194,14 @@ public class ClackShackImpl implements ClackShack
                     if (!progress.equals(lastSentProgress.get()))
                     {
                         lastSentProgress.set(progress);
-                        max.set(progress.getTotalRowsToRead());
                         final boolean continueProcessing = queryProgressListener.progress(progress);
                         if (!continueProcessing && !killedMarker.get())
                         {
                             logger.info("Progress listener returned false for query {}, attempting to kill query", queryId);
-                            killQuery(queryId).thenAccept(result -> logger.info("Killed {}", result));
+                            final boolean result = killQuery(queryId);
+                            logger.info("Killed {}", result);
                             killedMarker.set(true);
-                            completable.completeExceptionally(new QueryAbortedException());
+                            throw new QueryAbortedException();
                         }
                     }
                 }
@@ -216,22 +209,6 @@ public class ClackShackImpl implements ClackShack
             });
             req.param(WAIT_END_OF_QUERY_PARAM, "1");
             req.param(SEND_PROGRESS_IN_HTTP_HEADERS_PARAM, "1");
-
-            // Send final notification when done
-            if (!killedMarker.get())
-            {
-                completable
-                        .whenComplete((res, exc) -> Optional.ofNullable(res.getHeaders().get(CLICK_HOUSE_SUMMARY_HEADER_NAME))
-                                .map(summary -> readJson(summary, QueryProgress.class))
-                                .ifPresent(summary ->
-                                {
-                                    final QueryProgress finalProgress = new QueryProgress(summary.getReadRows(), summary.getReadBytes(), summary.getTotalRowsToRead());
-                                    if (!finalProgress.equals(lastSentProgress.get()))
-                                    {
-                                        queryProgressListener.progress(finalProgress);
-                                    }
-                                }));
-            }
         }
 
         // Enable max query time
@@ -240,8 +217,35 @@ public class ClackShackImpl implements ClackShack
         Optional.ofNullable(params).ifPresent(p -> p.forEach(param -> req.param(PARAM_PREFIX + param.getName(), Optional.ofNullable(param.getValue()).map(Object::toString).orElse(null))));
 
         // Perform request
-        req.send(new CompletableFutureResponseListener(completable));
-        return completable;
+        try
+        {
+            final ContentResponse response = req.send();
+
+            // Send final notification when done
+            if (!killedMarker.get())
+            {
+
+                Optional.ofNullable(response).flatMap(contentResponse -> Optional.ofNullable(contentResponse.getHeaders().get(CLICK_HOUSE_SUMMARY_HEADER_NAME))
+                        .map(summary -> readJson(summary, QueryProgress.class))).ifPresent(summary ->
+                {
+                    final QueryProgress finalProgress = new QueryProgress(summary.getReadRows(), summary.getReadBytes(), summary.getTotalRowsToRead());
+                    if (!finalProgress.equals(lastSentProgress.get()))
+                    {
+                        queryProgressListener.progress(finalProgress);
+                    }
+                });
+            }
+
+            return response;
+        }
+        catch (InterruptedException | TimeoutException exc)
+        {
+            throw new UncheckedIOException(new IOException(exc));
+        }
+        catch (ExecutionException exc)
+        {
+            throw new UncheckedIOException(new IOException(exc.getCause()));
+        }
     }
 
     @Override

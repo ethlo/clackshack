@@ -8,14 +8,14 @@
     <artifactId>clackshack</artifactId>
     <name>ClackShack</name>
     <url>https://github.com/ethlo/clackshack</url>
-    <description>Unofficial ClickHouse HTTP query interface client. Super light-weight asynchronous (CompletableFuture) modern API</description>
-    <version>1.0.2</version>
+    <description>Unofficial ClickHouse HTTP query interface client</description>
+    <version>2.0.0</version>
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
-                <version>2.5.5</version>
+                <version>2.7.3</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -113,7 +113,7 @@
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.5</version>
+                <version>1.6.13</version>
                 <extensions>true</extensions>
                 <configuration>
                     <serverId>sonatype-nexus-staging</serverId>
@@ -200,18 +200,18 @@
     <developers>
         <developer>
             <name>Morten Haraldsen</name>
-            <url>http://ethlo.com</url>
+            <url>https://ethlo.com</url>
         </developer>
     </developers>
     <scm>
-        <url>http://github.com:ethlo/clackshack</url>
+        <url>https://github.com:ethlo/clackshack</url>
         <connection>scm:git:git@github.com:ethlo/clackshack.git</connection>
         <developerConnection>scm:git:git@github.com:ethlo/clackshack.git</developerConnection>
     </scm>
     <licenses>
         <license>
             <name>The Apache Software License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
         </license>
     </licenses>
     <properties>
@@ -224,7 +224,7 @@
         <repository>
             <id>sonatype-nexus-staging</id>
             <name>Nexus Release Repository</name>
-            <url>http://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
         <snapshotRepository>
             <id>sonatype-nexus-snapshots</id>

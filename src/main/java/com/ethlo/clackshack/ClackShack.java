@@ -24,7 +24,6 @@ package com.ethlo.clackshack;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import com.ethlo.clackshack.model.QueryParam;
 import com.ethlo.clackshack.model.ResultSet;
@@ -39,7 +38,7 @@ public interface ClackShack extends AutoCloseable
      * @param queryOptions The query options for this query
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<ResultSet> query(final String query, QueryOptions queryOptions)
+    default ResultSet query(final String query, QueryOptions queryOptions)
     {
         return query(query, Collections.emptyMap(), queryOptions);
     }
@@ -51,7 +50,7 @@ public interface ClackShack extends AutoCloseable
      * @param params The named parameters for the query
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<ResultSet> query(final String query, final Map<String, Object> params)
+    default ResultSet query(final String query, final Map<String, Object> params)
     {
         return query(query, QueryParams.asList(params), QueryOptions.DEFAULT);
     }
@@ -65,7 +64,7 @@ public interface ClackShack extends AutoCloseable
      * @param queryOptions The query options for this query
      * @return a promise that holds the result of the query
      */
-    default CompletableFuture<ResultSet> query(final String query, final Map<String, Object> params, final QueryOptions queryOptions)
+    default ResultSet query(final String query, final Map<String, Object> params, final QueryOptions queryOptions)
     {
         return query(query, QueryParams.asList(params), queryOptions);
     }
@@ -76,10 +75,11 @@ public interface ClackShack extends AutoCloseable
      * @param queryId the id of the query to kill
      * @return True if the query was found, false if it did not exist
      */
-    default CompletableFuture<Boolean> killQuery(String queryId)
+    default boolean killQuery(String queryId)
     {
         //return query("KILL QUERY WHERE query_id = :queryId SYNC", Collections.singletonMap("queryId", queryId), QueryOptions.DEFAULT);
-        return query("SELECT 1", QueryOptions.create().queryId(queryId).replaceQuery(true)).thenApply(r -> true);
+        query("SELECT 1", QueryOptions.create().queryId(queryId).replaceQuery(true));
+        return true;
     }
 
     /**
@@ -89,34 +89,34 @@ public interface ClackShack extends AutoCloseable
      * @param params The named parameters for the query
      * @return a promise that holds the result of the query
      */
-    CompletableFuture<ResultSet> query(final String query, final List<QueryParam> params, final QueryOptions queryOptions);
+    ResultSet query(final String query, final List<QueryParam> params, final QueryOptions queryOptions);
 
     /**
      * Close any resources held by the client
      */
     void close();
 
-    default CompletableFuture<ResultSet> query(String query)
+    default ResultSet query(String query)
     {
         return query(query, QueryOptions.DEFAULT);
     }
 
-    CompletableFuture<Void> ddl(String ddl);
+    void ddl(String ddl);
 
-    default CompletableFuture<Void> insert(String query)
+    default void insert(String query)
     {
-        return insert(query, Collections.emptyMap(), QueryOptions.DEFAULT);
+        insert(query, Collections.emptyMap(), QueryOptions.DEFAULT);
     }
 
-    default CompletableFuture<Void> insert(String sql, final Map<String, Object> params)
+    default void insert(String sql, final Map<String, Object> params)
     {
-        return insert(sql, params, QueryOptions.DEFAULT);
+        insert(sql, params, QueryOptions.DEFAULT);
     }
 
-    CompletableFuture<Void> insert(String sql, final Map<String, Object> params, final QueryOptions queryOptions);
+    void insert(String sql, final Map<String, Object> params, final QueryOptions queryOptions);
 
-    default CompletableFuture<Void> insert(final String sql, final QueryOptions queryOptions)
+    default void insert(final String sql, final QueryOptions queryOptions)
     {
-        return insert(sql, Collections.emptyMap(), queryOptions);
+        insert(sql, Collections.emptyMap(), queryOptions);
     }
 }
