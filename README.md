@@ -10,4 +10,4 @@ Unofficial ClickHouse HTTP query interface client.
 
 ## Main features
 * Easy to use
-* Support progress updates via progress-listener
+* Support query progress updates via listener interface.
