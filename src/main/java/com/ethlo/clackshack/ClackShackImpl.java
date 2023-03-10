@@ -87,6 +87,7 @@ public class ClackShackImpl implements ClackShack
     {
         this(baseUrl, null);
     }
+
     public ClackShackImpl(String baseUrl, final String database)
     {
         this.baseUrl = baseUrl;
@@ -262,7 +263,12 @@ public class ClackShackImpl implements ClackShack
 
             return response;
         }
-        catch (InterruptedException | TimeoutException exc)
+        catch (InterruptedException exc)
+        {
+            Thread.currentThread().interrupt();
+            throw new UncheckedIOException(new IOException(exc));
+        }
+        catch (TimeoutException exc)
         {
             throw new UncheckedIOException(new IOException(exc));
         }
