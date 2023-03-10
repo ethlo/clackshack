@@ -144,7 +144,6 @@ public class ClackShackImpl implements ClackShack
                            final List<QueryParam> params,
                            final QueryOptions queryOptions)
     {
-        setDefaultDatabase(queryOptions);
         final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
         queryProgressListener.progress(new QueryProgress(0, 0, 0));
         final ContentResponse response = sendRequest(query, params, queryOptions);
@@ -177,20 +176,17 @@ public class ClackShackImpl implements ClackShack
         return new ResultSet(QueryResult.EMPTY);
     }
 
-    private void setDefaultDatabase(QueryOptions queryOptions)
-    {
-        if (queryOptions.getDatabase().isEmpty() && database != null)
-        {
-            queryOptions.database(database);
-        }
-    }
-
-    private ContentResponse sendRequest(final String query, final List<QueryParam> params, final QueryOptions queryOptions)
+    private ContentResponse sendRequest(final String query, final List<QueryParam> params, QueryOptions queryOptions)
     {
         final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
         final String q = params != null ? QueryUtil.format(query, params) : query;
         logger.debug("Running query with id {}: {}", queryId, q);
         final AtomicBoolean killedMarker = new AtomicBoolean(false);
+
+        if (queryOptions.getDatabase().isEmpty() && database != null)
+        {
+            queryOptions = queryOptions.database(database);
+        }
 
         final Request req = client.newRequest(baseUrl)
                 .method(HttpMethod.POST)
