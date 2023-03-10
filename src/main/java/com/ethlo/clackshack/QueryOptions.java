@@ -25,15 +25,17 @@ import java.util.Optional;
 
 public class QueryOptions
 {
-    public static final QueryOptions DEFAULT = new QueryOptions(null, false, null, null);
+    public static final QueryOptions DEFAULT = new QueryOptions(null, null, false, null, null);
 
+    private final String database;
     private final String queryId;
     private final boolean replaceQuery;
     private final Duration maxExecutionTime;
     private final QueryProgressListener progressListener;
 
-    public QueryOptions(final String queryId, final boolean replaceQuery, final Duration maxExecutionTime, final QueryProgressListener progressListener)
+    public QueryOptions(final String database, final String queryId, final boolean replaceQuery, final Duration maxExecutionTime, final QueryProgressListener progressListener)
     {
+        this.database = database;
         this.queryId = queryId;
         this.replaceQuery = replaceQuery;
         this.maxExecutionTime = maxExecutionTime;
@@ -75,6 +77,11 @@ public class QueryOptions
         return Optional.ofNullable(queryId);
     }
 
+    public Optional<String> getDatabase()
+    {
+        return Optional.ofNullable(database);
+    }
+
     /**
      * A progress listener that will be called every time ClickHouse provides an updated progress header
      *
@@ -87,17 +94,17 @@ public class QueryOptions
 
     public QueryOptions progressListener(QueryProgressListener progressListener)
     {
-        return new QueryOptions(this.queryId, this.replaceQuery, this.maxExecutionTime, progressListener);
+        return new QueryOptions(this.database, this.queryId, this.replaceQuery, this.maxExecutionTime, progressListener);
     }
 
     public QueryOptions queryId(final String queryId)
     {
-        return new QueryOptions(queryId, this.replaceQuery, this.maxExecutionTime, progressListener);
+        return new QueryOptions(this.database, queryId, this.replaceQuery, this.maxExecutionTime, progressListener);
     }
 
     public QueryOptions maxExecutionTime(final Duration maxExecutionTime)
     {
-        return new QueryOptions(queryId, this.replaceQuery, maxExecutionTime, progressListener);
+        return new QueryOptions(this.database, queryId, this.replaceQuery, maxExecutionTime, progressListener);
     }
 
     public QueryOptions replaceQuery(final boolean replaceQuery)
@@ -106,6 +113,11 @@ public class QueryOptions
         {
             throw new IllegalStateException("queryId is required when using replaceQuery");
         }
-        return new QueryOptions(this.queryId, replaceQuery, maxExecutionTime, progressListener);
+        return new QueryOptions(this.database, this.queryId, replaceQuery, maxExecutionTime, progressListener);
+    }
+
+    public QueryOptions database(String database)
+    {
+        return new QueryOptions(database, this.queryId, this.replaceQuery, this.maxExecutionTime, this.progressListener);
     }
 }

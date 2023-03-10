@@ -138,7 +138,7 @@ public class ClientTest
         {
             final String queryId = UUID.randomUUID().toString();
             final String query = "SELECT count() from numbers(200000000000)";
-            final AtomicReference<Exception> exceptionRef = runInSeparateThreadAnfFetchException(clackShack, query, QueryOptions.create().queryId(queryId));
+            final AtomicReference<Exception> exceptionRef = runInSeparateThreadAndFetchException(clackShack, query, QueryOptions.create().queryId(queryId));
 
             Thread.sleep(100);
             clackShack.killQuery(queryId);
@@ -233,7 +233,7 @@ public class ClientTest
             final String queryId = UUID.randomUUID().toString();
             final String query = "SELECT count() from numbers(100000000000)";
             final QueryOptions options = QueryOptions.create().queryId(queryId);
-            runInSeparateThreadAnfFetchException(clackShack, query, options);
+            runInSeparateThreadAndFetchException(clackShack, query, options);
             Thread.sleep(100);
 
             // Same query again, with same id
@@ -261,7 +261,7 @@ public class ClientTest
             final String queryId = UUID.randomUUID().toString();
 
             final String query = "SELECT count() from numbers(3000000000)";
-            final AtomicReference<Exception> exceptionRef = runInSeparateThreadAnfFetchException(clackShack, query, QueryOptions.create()
+            final AtomicReference<Exception> exceptionRef = runInSeparateThreadAndFetchException(clackShack, query, QueryOptions.create()
                     .queryId(queryId)
                     .progressListener(QueryProgressListener.LOGGER));
 
@@ -277,7 +277,7 @@ public class ClientTest
         }
     }
 
-    private AtomicReference<Exception> runInSeparateThreadAnfFetchException(ClackShack clackShack, String query, QueryOptions queryId)
+    private AtomicReference<Exception> runInSeparateThreadAndFetchException(ClackShack clackShack, String query, QueryOptions queryId)
     {
         final AtomicReference<Exception> exceptionRef = new AtomicReference<>();
         new Thread()
