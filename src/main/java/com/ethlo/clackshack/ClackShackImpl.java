@@ -61,6 +61,7 @@ public class ClackShackImpl implements ClackShack
     public static final String CLICK_HOUSE_SUMMARY_HEADER_NAME = "X-ClickHouse-Summary";
     public static final String WAIT_END_OF_QUERY_PARAM = "wait_end_of_query";
     public static final String SEND_PROGRESS_IN_HTTP_HEADERS_PARAM = "send_progress_in_http_headers";
+    public static final String DATABASE_PARAM = "database";
     public static final String QUERY_PARAM = "query";
     public static final String QUERY_ID_PARAM = "query_id";
     public static final String QUERY_DEFAULT_FORMAT = "default_format";
@@ -79,11 +80,17 @@ public class ClackShackImpl implements ClackShack
     }
 
     private final String baseUrl;
+    private final String database;
     private final HttpClient client;
 
     public ClackShackImpl(String baseUrl)
     {
+        this(baseUrl, null);
+    }
+    public ClackShackImpl(String baseUrl, final String database)
+    {
         this.baseUrl = baseUrl;
+        this.database = database;
         this.client = new HttpClient();
         this.client.setName("clackshack");
         try
@@ -104,6 +111,7 @@ public class ClackShackImpl implements ClackShack
 
     private void handleDataMutating(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
     {
+        setDefaultDatabase(queryOptions);
         final ContentResponse response = sendRequest(sql, QueryParams.asList(params), queryOptions);
         final int status = response.getStatus();
         if (status != HttpStatus.OK_200)
@@ -121,6 +129,7 @@ public class ClackShackImpl implements ClackShack
     @Override
     public void insert(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
     {
+        setDefaultDatabase(queryOptions);
         handleDataMutating(sql, params, queryOptions);
     }
 
@@ -134,6 +143,7 @@ public class ClackShackImpl implements ClackShack
                            final List<QueryParam> params,
                            final QueryOptions queryOptions)
     {
+        setDefaultDatabase(queryOptions);
         final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
         queryProgressListener.progress(new QueryProgress(0, 0, 0));
         final ContentResponse response = sendRequest(query, params, queryOptions);
@@ -166,6 +176,14 @@ public class ClackShackImpl implements ClackShack
         return new ResultSet(QueryResult.EMPTY);
     }
 
+    private void setDefaultDatabase(QueryOptions queryOptions)
+    {
+        if (queryOptions.getDatabase().isEmpty() && database != null)
+        {
+            queryOptions.database(database);
+        }
+    }
+
     private ContentResponse sendRequest(final String query, final List<QueryParam> params, final QueryOptions queryOptions)
     {
         final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
@@ -179,6 +197,12 @@ public class ClackShackImpl implements ClackShack
                 .param(QUERY_PARAM, q)
                 .param(QUERY_ID_PARAM, Objects.requireNonNull(queryId, "queryId must not be null"))
                 .param(REPLACE_RUNNING_QUERY_PARAM, queryOptions.replaceQuery() ? "1" : "0");
+
+        queryOptions.getDatabase().ifPresent(db ->
+        {
+            logger.debug("Default DB set to {} for query", db);
+            req.param(DATABASE_PARAM, db);
+        });
 
         // Enable progress headers
         final AtomicReference<QueryProgress> lastSentProgress = new AtomicReference<>();
