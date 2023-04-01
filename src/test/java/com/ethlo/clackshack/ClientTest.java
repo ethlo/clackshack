@@ -21,32 +21,29 @@ package com.ethlo.clackshack;
  */
 
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
-import static org.junit.Assert.assertThrows;
+import com.ethlo.clackshack.model.QueryProgress;
+import com.ethlo.clackshack.model.ResultSet;
+import com.ethlo.clackshack.model.Row;
+import com.ethlo.clackshack.util.IOUtil;
 
-import java.net.Inet4Address;
-import java.net.Inet6Address;
-import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
+import org.eclipse.jetty.util.StringUtil;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ethlo.clackshack.model.QueryProgress;
-import com.ethlo.clackshack.model.ResultSet;
-import com.ethlo.clackshack.model.Row;
-import com.ethlo.clackshack.util.IOUtil;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
+import static org.junit.Assert.assertThrows;
 
 public class ClientTest
 {
@@ -274,6 +271,36 @@ public class ClientTest
 
             assertThat(replacement).isNotNull();
             assertThat(exceptionRef.get()).isInstanceOf(QueryAbortedException.class);
+        }
+    }
+
+    @Test
+    public void testLargerResultSet()
+    {
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
+        {
+            final String queryId = UUID.randomUUID().toString();
+
+            final String query = "SELECT * from numbers(100000)";
+            final ResultSet resultSet = clackShack.query(query, QueryOptions.create()
+                    .queryId(queryId)
+                    .progressListener(QueryProgressListener.LOGGER));
+            resultSet.getRow(99_999);
+        }
+    }
+
+    @Test
+    public void testLargerRequestSet()
+    {
+        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
+        {
+            final String queryId = UUID.randomUUID().toString();
+
+            final String query = "SELECT rand()" + ",rand()".repeat(1000);
+            final ResultSet resultSet = clackShack.query(query, QueryOptions.create()
+                    .queryId(queryId)
+                    .progressListener(QueryProgressListener.LOGGER));
+            resultSet.getRow(0);
         }
     }
 

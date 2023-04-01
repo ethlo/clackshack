@@ -23,7 +23,6 @@ package com.ethlo.clackshack;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.List;
@@ -32,13 +31,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.api.Response;
+import org.eclipse.jetty.client.util.InputStreamResponseListener;
+import org.eclipse.jetty.client.util.StringRequestContent;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
@@ -112,12 +114,11 @@ public class ClackShackImpl implements ClackShack
 
     private void handleDataMutating(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
     {
-        setDefaultDatabase(queryOptions);
-        final ContentResponse response = sendRequest(sql, QueryParams.asList(params), queryOptions);
-        final int status = response.getStatus();
+        final ResponseData responseData = sendRequest(sql, QueryParams.asList(params), queryOptions);
+        final int status = responseData.response().getStatus();
         if (status != HttpStatus.OK_200)
         {
-            final String strContent = getString(response);
+            final String strContent = getString(responseData.contentListener());
             final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
             if (error.isPresent())
             {
@@ -130,13 +131,19 @@ public class ClackShackImpl implements ClackShack
     @Override
     public void insert(final String sql, final Map<String, Object> params, final QueryOptions queryOptions)
     {
-        setDefaultDatabase(queryOptions);
         handleDataMutating(sql, params, queryOptions);
     }
 
-    private String getString(final ContentResponse response)
+    private String getString(final InputStreamResponseListener response)
     {
-        return StandardCharsets.UTF_8.decode(ByteBuffer.wrap(response.getContent())).toString();
+        try
+        {
+            return new String(response.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
@@ -146,12 +153,12 @@ public class ClackShackImpl implements ClackShack
     {
         final QueryProgressListener queryProgressListener = queryOptions.progressListener().orElse(QueryProgressListener.NOP);
         queryProgressListener.progress(new QueryProgress(0, 0, 0));
-        final ContentResponse response = sendRequest(query, params, queryOptions);
+        final ResponseData responseData = sendRequest(query, params, queryOptions);
 
         // Process response
-        final int status = response.getStatus();
-        final String contentType = response.getHeaders().get(CONTENT_TYPE_HEADER_NAME);
-        final String strContent = getString(response);
+        final int status = responseData.response().getStatus();
+        final String contentType = responseData.response().getHeaders().get(CONTENT_TYPE_HEADER_NAME);
+        final String strContent = getString(responseData.contentListener());
         if (!"".equals(strContent.trim()))
         {
             final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
@@ -176,7 +183,7 @@ public class ClackShackImpl implements ClackShack
         return new ResultSet(QueryResult.EMPTY);
     }
 
-    private ContentResponse sendRequest(final String query, final List<QueryParam> params, QueryOptions queryOptions)
+    private ResponseData sendRequest(final String query, final List<QueryParam> params, QueryOptions queryOptions)
     {
         final String queryId = queryOptions.queryId().orElse(UUID.randomUUID().toString());
         final String q = params != null ? QueryUtil.format(query, params) : query;
@@ -191,9 +198,9 @@ public class ClackShackImpl implements ClackShack
         final Request req = client.newRequest(baseUrl)
                 .method(HttpMethod.POST)
                 .param(QUERY_DEFAULT_FORMAT, "JSON")
-                .param(QUERY_PARAM, q)
                 .param(QUERY_ID_PARAM, Objects.requireNonNull(queryId, "queryId must not be null"))
-                .param(REPLACE_RUNNING_QUERY_PARAM, queryOptions.replaceQuery() ? "1" : "0");
+                .param(REPLACE_RUNNING_QUERY_PARAM, queryOptions.replaceQuery() ? "1" : "0")
+                .body(new StringRequestContent(q));
 
         queryOptions.getDatabase().ifPresent(db ->
         {
@@ -240,12 +247,13 @@ public class ClackShackImpl implements ClackShack
         // Perform request
         try
         {
-            final ContentResponse response = req.send();
+            final InputStreamResponseListener listener = new InputStreamResponseListener();
+            req.send(listener);
+            final Response response = listener.get(30, TimeUnit.SECONDS);
 
             // Send final notification when done
             if (!killedMarker.get())
             {
-
                 Optional.ofNullable(response).flatMap(contentResponse -> Optional.ofNullable(contentResponse.getHeaders().get(CLICK_HOUSE_SUMMARY_HEADER_NAME))
                         .map(summary -> readJson(summary, QueryProgress.class))).ifPresent(summary ->
                 {
@@ -257,7 +265,7 @@ public class ClackShackImpl implements ClackShack
                 });
             }
 
-            return response;
+            return new ResponseData(response, listener);
         }
         catch (InterruptedException exc)
         {
