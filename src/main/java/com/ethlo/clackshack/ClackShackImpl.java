@@ -157,23 +157,21 @@ public class ClackShackImpl implements ClackShack
 
         // Process response
         final int status = responseData.response().getStatus();
-        final String contentType = responseData.response().getHeaders().get(CONTENT_TYPE_HEADER_NAME);
         final String strContent = getString(responseData.contentListener());
         if (!"".equals(strContent.trim()))
         {
             final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
-            if (error.isEmpty() && contentType.contains(APPLICATION_JSON_CONTENT_TYPE))
+            if (error.isEmpty())
             {
                 final QueryResult jsonResult = readJson(strContent, QueryResult.class);
                 final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
                 queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
                 return new ResultSet(jsonResult);
             }
-            else if (error.isPresent())
+            else
             {
                 throw ClickHouseErrorParser.handle(error.get());
             }
-            throw new UncheckedIOException(new IOException("Unexpected response: " + status + " - " + strContent));
         }
 
         if (status != HttpStatus.OK_200)
