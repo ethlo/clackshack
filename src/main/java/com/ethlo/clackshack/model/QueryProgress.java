@@ -39,7 +39,7 @@ public class QueryProgress
     {
         this.readRows = readRows;
         this.readBytes = readBytes;
-        this.totalRowsToRead = totalRowsToRead;
+        this.totalRowsToRead = Math.max(totalRowsToRead, readRows);
     }
 
     public double getPercentDone()

@@ -32,7 +32,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 public class QueryResult
 {
-    public static final QueryResult EMPTY = new QueryResult(Collections.emptyList(), Collections.emptyList(), new QueryStatistics(0D, 0, 0), 0, 0);
+    public static final QueryResult EMPTY = new QueryResult(Collections.emptyList(), Collections.emptyList(), new QueryStatistics(0D, 0, 0, 0), 0, 0);
 
     private final List<MetaEntry> meta;
     private final List<Map<String, String>> queryData;

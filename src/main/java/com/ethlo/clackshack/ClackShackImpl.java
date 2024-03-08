@@ -24,6 +24,7 @@ package com.ethlo.clackshack;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
@@ -84,16 +85,18 @@ public class ClackShackImpl implements ClackShack
     private final String baseUrl;
     private final String database;
     private final HttpClient client;
+    private final Duration timeout;
 
     public ClackShackImpl(String baseUrl)
     {
-        this(baseUrl, null);
+        this(baseUrl, null, Duration.ofSeconds(30));
     }
 
-    public ClackShackImpl(String baseUrl, final String database)
+    public ClackShackImpl(String baseUrl, final String database, final Duration timeout)
     {
         this.baseUrl = baseUrl;
         this.database = database;
+        this.timeout = timeout;
         this.client = new HttpClient();
         this.client.setName("clackshack");
         try
@@ -158,14 +161,14 @@ public class ClackShackImpl implements ClackShack
         // Process response
         final int status = responseData.response().getStatus();
         final String strContent = getString(responseData.contentListener());
-        if (!"".equals(strContent.trim()))
+        if (!strContent.trim().isEmpty())
         {
             final Optional<AbstractMap.SimpleImmutableEntry<Integer, String>> error = ClickHouseErrorParser.parseError(strContent);
             if (error.isEmpty())
             {
+                logger.debug("Final JSON progress: {}", strContent);
                 final QueryResult jsonResult = readJson(strContent, QueryResult.class);
-                final long rowsRead = jsonResult.getQueryStatistics().getRowsRead();
-                queryProgressListener.progress(new QueryProgress(rowsRead, jsonResult.getQueryStatistics().getBytesRead(), rowsRead));
+                queryProgressListener.progress(new QueryProgress(jsonResult.getQueryStatistics().getRowsRead(), jsonResult.getQueryStatistics().getBytesRead(), jsonResult.getQueryStatistics().getTotalRowsToRead()));
                 return new ResultSet(jsonResult);
             }
             else
@@ -215,7 +218,9 @@ public class ClackShackImpl implements ClackShack
             {
                 if (CLICK_HOUSE_PROGRESS_HEADER_NAME.equals(httpField.getName()))
                 {
-                    final QueryProgress progress = readJson(httpField.getValue(), QueryProgress.class);
+                    final String strContent = httpField.getValue();
+                    logger.debug("JSON progress from header: {}", strContent);
+                    final QueryProgress progress = readJson(strContent, QueryProgress.class);
 
                     if (!progress.equals(lastSentProgress.get()))
                     {
@@ -247,7 +252,7 @@ public class ClackShackImpl implements ClackShack
         {
             final InputStreamResponseListener listener = new InputStreamResponseListener();
             req.send(listener);
-            final Response response = listener.get(30, TimeUnit.SECONDS);
+            final Response response = listener.get(timeout.getSeconds(), TimeUnit.SECONDS);
 
             // Send final notification when done
             if (!killedMarker.get())
@@ -272,7 +277,7 @@ public class ClackShackImpl implements ClackShack
         }
         catch (TimeoutException exc)
         {
-            throw new UncheckedIOException(new IOException(exc));
+            throw new QueryTimeoutException(queryId, timeout, lastSentProgress.get(), "Query " + queryId + " timed out after " + timeout.getSeconds() + " seconds with a query progress of " + lastSentProgress.get().getPercentDone() + "%");
         }
         catch (ExecutionException exc)
         {

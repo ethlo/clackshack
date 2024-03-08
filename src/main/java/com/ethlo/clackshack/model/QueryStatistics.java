@@ -30,14 +30,17 @@ public class QueryStatistics
     private final double elapsed;
     private final long rows_read;
     private final long bytesRead;
+    private final long totalRowsToRead;
 
     public QueryStatistics(@JsonProperty("elapsed") final double elapsed,
                            @JsonProperty("rows_read") final long rowsRead,
-                           @JsonProperty("bytes_read") final long bytesRead)
+                           @JsonProperty("bytes_read") final long bytesRead,
+                           @JsonProperty("total_rows_to_read") final long totalRowsToRead)
     {
         this.elapsed = elapsed;
         this.rows_read = rowsRead;
         this.bytesRead = bytesRead;
+        this.totalRowsToRead = totalRowsToRead;
     }
 
     public Duration getElapsed()
@@ -55,5 +58,8 @@ public class QueryStatistics
         return bytesRead;
     }
 
-
+    public long getTotalRowsToRead()
+    {
+        return totalRowsToRead;
+    }
 }
