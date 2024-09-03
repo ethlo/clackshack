@@ -34,10 +34,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ethlo.clackshack.TypeConversionException;
+import com.fasterxml.jackson.databind.JsonNode;
 
 public class ResultSet implements Iterable<Row>
 {
     private static final Logger logger = LoggerFactory.getLogger(ResultSet.class);
+    private static final Pattern NULLABLE_PATTERN = Pattern.compile("^([a-zA-Z0-9]+).*\\)");
+    private static final Pattern LOW_CARDINALIY_PATTERN = Pattern.compile("^LowCardinality\\((.*)\\)$");
 
     private final List<Row> data;
 
@@ -46,10 +49,10 @@ public class ResultSet implements Iterable<Row>
         final Map<String, String> entryTypes = getEntryTypes(result.getMeta());
 
         this.data = new ArrayList<>(result.getRows());
-        for (Map<String, String> rowData : result.getQueryData())
+        for (Map<String, JsonNode> rowData : result.getQueryData())
         {
             final Map<String, Object> typed = new LinkedHashMap<>();
-            for (Map.Entry<String, String> e : rowData.entrySet())
+            for (Map.Entry<String, JsonNode> e : rowData.entrySet())
             {
                 typed.put(e.getKey(), convertType(entryTypes.get(e.getKey()), e.getValue()));
             }
@@ -57,32 +60,37 @@ public class ResultSet implements Iterable<Row>
         }
     }
 
-    public static Object convertType(final String chType, final String value)
+    public static Object convertType(final String chType, final JsonNode value)
     {
         if (value == null)
         {
             return null;
         }
 
-        final String nullableStripped = stripNullable(chType);
+        final String lowCardinalityStripped = stripLowCardinality(chType);
+        final String nullableStripped = stripNullable(lowCardinalityStripped);
         final String baseType = stripParameters(nullableStripped);
 
         logger.trace("Type: {}", baseType);
-        final DataTypes.DataType<?> type = DataTypes.match(baseType).orElseThrow(() -> new IllegalArgumentException("Unknown type: " + baseType));
+        final DataTypes.DataType<?> type = findType(baseType);
         try
         {
             return type.getParser().apply(value);
         }
         catch (Exception exc)
         {
-            throw new TypeConversionException(type.getName(), value, type.getType(), exc);
+            throw new TypeConversionException(type.getName(), value.toPrettyString(), type.getType(), exc);
         }
+    }
+
+    public static DataTypes.DataType<?> findType(String baseType)
+    {
+        return DataTypes.match(baseType).orElseThrow(() -> new IllegalArgumentException("Unknown type: " + baseType));
     }
 
     private static String stripParameters(final String nullableStripped)
     {
-        final Pattern nullablePattern = Pattern.compile("^([a-zA-Z0-9]+).*\\)");
-        final Matcher nullableMatcher = nullablePattern.matcher(nullableStripped);
+        final Matcher nullableMatcher = NULLABLE_PATTERN.matcher(nullableStripped);
         if (nullableMatcher.find())
         {
             return nullableMatcher.group(1);
@@ -97,6 +105,19 @@ public class ResultSet implements Iterable<Row>
     {
         final Pattern nullablePattern = Pattern.compile("^Nullable\\((.*)\\)$");
         final Matcher nullableMatcher = nullablePattern.matcher(chType);
+        if (nullableMatcher.find())
+        {
+            return nullableMatcher.group(1);
+        }
+        else
+        {
+            return chType;
+        }
+    }
+
+    private static String stripLowCardinality(final String chType)
+    {
+        final Matcher nullableMatcher = LOW_CARDINALIY_PATTERN.matcher(chType);
         if (nullableMatcher.find())
         {
             return nullableMatcher.group(1);

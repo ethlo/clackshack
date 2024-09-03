@@ -30,11 +30,13 @@ import com.ethlo.clackshack.model.QueryParam;
 
 public class QueryUtil
 {
+    private static final Pattern PATTERN = Pattern.compile(":(\\w+)");
+
     public static String format(String format, List<QueryParam> values)
     {
         final StringBuilder formatter = new StringBuilder(format);
         final List<Object> valueList = new ArrayList<>();
-        final Matcher matcher = Pattern.compile(":(\\w+)").matcher(format);
+        final Matcher matcher = PATTERN.matcher(format);
 
         while (matcher.find())
         {
@@ -55,6 +57,9 @@ public class QueryUtil
 
     private static QueryParam getValue(final String key, final List<QueryParam> values)
     {
-        return values.stream().filter(v -> v.getName().equals(key)).findFirst().orElseThrow(() -> new IllegalArgumentException("No such param name: " + key));
+        return values.stream()
+                .filter(v -> v.getName().equals(key))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No such param name: " + key));
     }
 }

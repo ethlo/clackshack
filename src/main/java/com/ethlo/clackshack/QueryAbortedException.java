@@ -22,8 +22,8 @@ package com.ethlo.clackshack;
 
 public class QueryAbortedException extends ClickHouseException
 {
-    public QueryAbortedException()
+    public QueryAbortedException(final String queryId)
     {
-        super(394, "Query was aborted");
+        super(394, "Query " + queryId + " was aborted");
     }
 }

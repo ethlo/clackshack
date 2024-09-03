@@ -21,27 +21,26 @@ package com.ethlo.clackshack.model;
  */
 
 
-import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.ethlo.clackshack.ClackShackImpl;
+import com.ethlo.clackshack.util.JsonUtil;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 
 public class QueryResult
 {
     public static final QueryResult EMPTY = new QueryResult(Collections.emptyList(), Collections.emptyList(), new QueryStatistics(0D, 0, 0, 0), 0, 0);
 
     private final List<MetaEntry> meta;
-    private final List<Map<String, String>> queryData;
+    private final List<Map<String, JsonNode>> queryData;
     private final QueryStatistics queryStatistics;
     private final int rows;
     private final long rowsBeforeLimitAtLeast;
 
     public QueryResult(@JsonProperty("meta") final List<MetaEntry> meta,
-                       @JsonProperty("data") List<Map<String, String>> queryData,
+                       @JsonProperty("data") List<Map<String, JsonNode>> queryData,
                        @JsonProperty("statistics") QueryStatistics queryStatistics,
                        @JsonProperty("rows") final int rows,
                        @JsonProperty("rows_before_limit_at_least") final long rowsBeforeLimitAtLeast)
@@ -53,7 +52,7 @@ public class QueryResult
         this.rowsBeforeLimitAtLeast = rowsBeforeLimitAtLeast;
     }
 
-    public List<Map<String, String>> getQueryData()
+    public List<Map<String, JsonNode>> getQueryData()
     {
         return queryData;
     }
@@ -76,14 +75,7 @@ public class QueryResult
     @Override
     public String toString()
     {
-        try
-        {
-            return ClackShackImpl.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(this);
-        }
-        catch (JsonProcessingException e)
-        {
-            throw new UncheckedIOException(e);
-        }
+        return JsonUtil.prettyString(this);
     }
 
     public long getRowsBeforeLimitAtLeast()

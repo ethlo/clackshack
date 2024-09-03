@@ -20,10 +20,17 @@ package com.ethlo.clackshack;
  * #L%
  */
 
+import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.eclipse.jetty.client.Response;
+import org.eclipse.jetty.http.HttpFields;
+
+import com.ethlo.clackshack.model.QueryProgress;
+import com.ethlo.clackshack.util.JsonUtil;
 
 public class ClickHouseErrorParser
 {
@@ -42,18 +49,20 @@ public class ClickHouseErrorParser
         return Optional.empty();
     }
 
-    public static ClickHouseException handle(final AbstractMap.SimpleImmutableEntry<Integer, String> error)
+    public static ClickHouseException handle(final int errorNum, final String message, final QueryOptions queryOptions, final Response response)
     {
-        final int id = error.getKey();
-        final String message = error.getValue();
-        switch (id)
-        {
-            case 216:
-                return new DuplicateQueryIdException(message);
+        final HttpFields headers = response.getHeaders();
+        final String queryId = headers.get(ClackShackImpl.CLICKHOUSE_QUERY_ID_HEADER_NAME);
+        final QueryProgress progress = Optional.ofNullable(headers.get(ClackShackImpl.CLICKHOUSE_SUMMARY_HEADER_NAME))
+                .map(summary -> JsonUtil.readJson(summary, QueryProgress.class)).orElse(QueryProgress.ZERO);
 
-            case 394:
-                return new QueryAbortedException();
-        }
-        return new ClickHouseException(id, message);
+        return switch (errorNum)
+        {
+            case 216 -> new DuplicateQueryIdException(message);
+            case 394 -> new QueryAbortedException(queryId);
+            case 159 ->
+                    new QueryTimeoutException(queryId, queryOptions.maxExecutionTime().orElse(Duration.ZERO), progress, message);
+            default -> new ClickHouseException(errorNum, message);
+        };
     }
 }

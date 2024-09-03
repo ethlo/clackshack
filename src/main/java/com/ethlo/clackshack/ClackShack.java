@@ -72,14 +72,12 @@ public interface ClackShack extends AutoCloseable
     /**
      * Kill the query with the specified query ID
      *
-     * @param queryId the id of the query to kill
-     * @return True if the query was found, false if it did not exist
+     * @param queryId     the id of the query to kill
+     * @param synchronous Whether to wait for the kill to finish
      */
-    default boolean killQuery(String queryId)
+    default void killQuery(String queryId, final boolean synchronous)
     {
-        //return query("KILL QUERY WHERE query_id = :queryId SYNC", Collections.singletonMap("queryId", queryId), QueryOptions.DEFAULT);
-        query("SELECT 1", QueryOptions.create().queryId(queryId).replaceQuery(true));
-        return true;
+        query("KILL QUERY WHERE query_id = :queryId " + (synchronous ? "SYNC" : ""), Collections.singletonMap("queryId", queryId), QueryOptions.DEFAULT);
     }
 
     /**
@@ -99,24 +97,5 @@ public interface ClackShack extends AutoCloseable
     default ResultSet query(String query)
     {
         return query(query, QueryOptions.DEFAULT);
-    }
-
-    void ddl(String ddl);
-
-    default void insert(String query)
-    {
-        insert(query, Collections.emptyMap(), QueryOptions.DEFAULT);
-    }
-
-    default void insert(String sql, final Map<String, Object> params)
-    {
-        insert(sql, params, QueryOptions.DEFAULT);
-    }
-
-    void insert(String sql, final Map<String, Object> params, final QueryOptions queryOptions);
-
-    default void insert(final String sql, final QueryOptions queryOptions)
-    {
-        insert(sql, Collections.emptyMap(), queryOptions);
     }
 }
