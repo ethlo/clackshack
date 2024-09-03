@@ -81,6 +81,16 @@ public interface ClackShack extends AutoCloseable
     }
 
     /**
+     * Kill the query with the specified query ID
+     *
+     * @param queryId the id of the query to kill
+     */
+    default void killQuery(String queryId)
+    {
+        killQuery(queryId, false);
+    }
+
+    /**
      * Parameterized query method with progress  listener
      *
      * @param query  The SQL query

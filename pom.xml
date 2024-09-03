@@ -131,7 +131,7 @@
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.13</version>
+                <version>1.6.14</version>
                 <extensions>true</extensions>
                 <configuration>
                     <serverId>sonatype-nexus-staging</serverId>
@@ -154,7 +154,6 @@
                 </executions>
                 <configuration>
                     <executable>gpg</executable>
-                    <keyname>8E68968CE7C85B314DF175FD9CC6720FBB1B27BA</keyname>
                 </configuration>
             </plugin>
             <plugin>
