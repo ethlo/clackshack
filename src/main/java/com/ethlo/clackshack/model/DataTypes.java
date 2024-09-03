@@ -20,6 +20,8 @@ package com.ethlo.clackshack.model;
  * #L%
  */
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;
@@ -35,21 +37,25 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 public class DataTypes
 {
-    public static final DataType<Short> UINT_8 = new DataType<>("UInt8", Short.class, Short::valueOf);
-    public static final DataType<Byte> INT_8 = new DataType<>("Int8", Byte.class, Byte::valueOf);
+    public static final SimpleDataType<Short> UINT_8 = new SimpleDataType<>("UInt8", Short.class, Short::valueOf);
+    public static final SimpleDataType<Byte> INT_8 = new SimpleDataType<>("Int8", Byte.class, Byte::valueOf);
 
-    public static final DataType<Integer> UINT_16 = new DataType<>("UInt16", Integer.class, Integer::valueOf);
-    public static final DataType<Integer> INT_16 = new DataType<>("Int16", Integer.class, Integer::valueOf);
+    public static final SimpleDataType<Integer> UINT_16 = new SimpleDataType<>("UInt16", Integer.class, Integer::valueOf);
+    public static final SimpleDataType<Integer> INT_16 = new SimpleDataType<>("Int16", Integer.class, Integer::valueOf);
 
-    public static final DataType<Long> UINT_32 = new DataType<>("UInt32", Long.class, Long::valueOf);
-    public static final DataType<Integer> INT_32 = new DataType<>("Int32", Integer.class, Integer::valueOf);
+    public static final SimpleDataType<Long> UINT_32 = new SimpleDataType<>("UInt32", Long.class, Long::valueOf);
+    public static final SimpleDataType<Integer> INT_32 = new SimpleDataType<>("Int32", Integer.class, Integer::valueOf);
 
-    public static final DataType<BigInteger> UINT_64 = new DataType<>("UInt64", BigInteger.class, BigInteger::new);
-    public static final DataType<Long> INT_64 = new DataType<>("Int64", Long.class, Long::valueOf);
+    public static final SimpleDataType<BigInteger> UINT_64 = new SimpleDataType<>("UInt64", BigInteger.class, BigInteger::new);
+    public static final SimpleDataType<Long> INT_64 = new SimpleDataType<>("Int64", Long.class, Long::valueOf);
 
-    public static final DataType<Inet4Address> IP_V4 = new DataType<>("IPv4", Inet4Address.class, value ->
+    public static final SimpleDataType<Inet4Address> IP_V4 = new SimpleDataType<>("IPv4", Inet4Address.class, value ->
     {
         try
         {
@@ -61,7 +67,7 @@ public class DataTypes
         }
     });
 
-    public static final DataType<Inet6Address> IP_V6 = new DataType<>("IPv6", Inet6Address.class, value ->
+    public static final SimpleDataType<Inet6Address> IP_V6 = new SimpleDataType<>("IPv6", Inet6Address.class, value ->
     {
         try
         {
@@ -73,40 +79,49 @@ public class DataTypes
         }
     });
 
-    public static final DataType<LocalDateTime> DATE_TIME_64 =
-            new DataType<>("DateTime64", LocalDateTime.class, value ->
+    public static final SimpleDataType<LocalDateTime> DATE_TIME_64 =
+            new SimpleDataType<>("DateTime64", LocalDateTime.class, value ->
                     LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
             );
 
-    public static final DataType<String> ENUM = new DataType<>("Enum", String.class, value -> value);
-    public static final DataType<String> ENUM_8 = new DataType<>("Enum8", String.class, value -> value);
-    public static final DataType<String> ENUM_16 = new DataType<>("Enum16", String.class, value -> value);
+    public static final SimpleDataType<String> ENUM = new SimpleDataType<>("Enum", String.class, value -> value);
+    public static final SimpleDataType<String> ENUM_8 = new SimpleDataType<>("Enum8", String.class, value -> value);
+    public static final SimpleDataType<String> ENUM_16 = new SimpleDataType<>("Enum16", String.class, value -> value);
 
-    public static final DataType<LocalDateTime> DATE_TIME =
-            new DataType<>("DateTime", LocalDateTime.class, value ->
+    public static final SimpleDataType<LocalDateTime> DATE_TIME =
+            new SimpleDataType<>("DateTime", LocalDateTime.class, value ->
                     LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             );
 
-    public static final DataType<LocalDate> DATE = new DataType<>("Date", LocalDate.class, LocalDate::parse);
+    public static final SimpleDataType<LocalDate> DATE = new SimpleDataType<>("Date", LocalDate.class, LocalDate::parse);
 
-    public static final DataType<String> STRING = new DataType<>("String", String.class, value -> value);
-    public static final DataType<String> FIXED_STRING = new DataType<>("FixedString", String.class, value -> value);
+    public static final SimpleDataType<String> STRING = new SimpleDataType<>("String", String.class, value -> value);
+    public static final SimpleDataType<String> FIXED_STRING = new SimpleDataType<>("FixedString", String.class, value -> value);
 
-    public static final DataType<java.util.UUID> UUID = new DataType<>("UUID", java.util.UUID.class, java.util.UUID::fromString);
+    public static final SimpleDataType<java.util.UUID> UUID = new SimpleDataType<>("UUID", java.util.UUID.class, java.util.UUID::fromString);
 
-    public static final DataType<Float> FLOAT_32 = new DataType<>("Float32", Float.class, Float::valueOf);
-    public static final DataType<Double> FLOAT_64 = new DataType<>("Float64", Double.class, Double::valueOf);
+    public static final SimpleDataType<Float> FLOAT_32 = new SimpleDataType<>("Float32", Float.class, Float::valueOf);
+    public static final SimpleDataType<Double> FLOAT_64 = new SimpleDataType<>("Float64", Double.class, Double::valueOf);
 
-    public static final DataType<BigDecimal> DECIMAL = new DataType<>("Decimal", BigDecimal.class, BigDecimal::new);
-    public static final DataType<BigDecimal> DECIMAL_32 = new DataType<>("Decimal32", BigDecimal.class, BigDecimal::new);
-    public static final DataType<BigDecimal> DECIMAL_64 = new DataType<>("Decimal64", BigDecimal.class, BigDecimal::new);
+    public static final SimpleDataType<BigDecimal> DECIMAL = new SimpleDataType<>("Decimal", BigDecimal.class, BigDecimal::new);
+    public static final SimpleDataType<BigDecimal> DECIMAL_32 = new SimpleDataType<>("Decimal32", BigDecimal.class, BigDecimal::new);
+    public static final SimpleDataType<BigDecimal> DECIMAL_64 = new SimpleDataType<>("Decimal64", BigDecimal.class, BigDecimal::new);
+    public static final DataType<ArrayNode> ARRAY = new DataType<>("Array", ArrayNode.class, n -> Optional.ofNullable(n)
+            .filter(node -> n.isArray())
+            .map(ArrayNode.class::cast)
+            .orElseThrow(() -> new UncheckedIOException(new IOException("Unable to handle 'Array' type that is not an array node"))));
+
+    public static final DataType<ObjectNode> MAP = new DataType<>("Map", ObjectNode.class, n -> Optional.ofNullable(n)
+            .filter(node -> n.isObject())
+            .map(ObjectNode.class::cast)
+            .orElseThrow(() -> new UncheckedIOException(new IOException("Unable to handle 'Map' type that is not an object node"))));
 
     private static final Map<String, DataType<?>> TYPES;
 
     static
     {
         TYPES = Arrays.stream(DataTypes.class.getDeclaredFields())
-                .filter(f -> f.getType().equals(DataType.class))
+                .filter(f -> DataType.class.isAssignableFrom(f.getType()))
                 .map(f ->
                         {
                             try
@@ -131,22 +146,22 @@ public class DataTypes
      *
      * @param dataType the data type to add
      */
-    public static void addDataType(final DataType<?> dataType)
+    public static void addDataType(final SimpleDataType<?> dataType)
     {
         TYPES.put(dataType.getName(), dataType);
     }
 
     public static class DataType<R>
     {
-        private final String name;
-        private final Class<R> type;
-        private final Function<String, R> parser;
+        protected final String name;
+        protected final Class<R> type;
+        protected final Function<JsonNode, R> parser;
 
-        public DataType(final String name, final Class<R> type, final Function<String, R> parser)
+        public DataType(String name, Class<R> type, Function<JsonNode, R> parser)
         {
+            this.parser = parser;
             this.name = name;
             this.type = type;
-            this.parser = parser;
         }
 
         public String getName()
@@ -154,7 +169,7 @@ public class DataTypes
             return name;
         }
 
-        public Function<String, R> getParser()
+        public Function<JsonNode, R> getParser()
         {
             return parser;
         }
@@ -162,6 +177,14 @@ public class DataTypes
         public Class<R> getType()
         {
             return type;
+        }
+    }
+
+    public static class SimpleDataType<R> extends DataType<R>
+    {
+        public SimpleDataType(final String name, final Class<R> type, final Function<String, R> parser)
+        {
+            super(name, type, n -> parser.apply(n.asText()));
         }
     }
 }

@@ -23,7 +23,11 @@ package com.ethlo.clackshack.model;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.Objects;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class QueryParam
 {
@@ -93,6 +97,18 @@ public class QueryParam
     public static QueryParam ofNull(String name, String type)
     {
         return new QueryParam(name, type);
+    }
+
+    public static <K, V> QueryParam of(String name, Map<K, V> map, String keyType, String valueType)
+    {
+        try
+        {
+            return new QueryParam(name, "Map(%s, %s)".formatted(keyType, valueType), new ObjectMapper().writeValueAsString(map));
+        }
+        catch (JsonProcessingException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     public String getName()

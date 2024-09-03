@@ -8,6 +8,6 @@ services:
     command: mvn install -Dsurefire.skipAfterFailureCount=1 -U
     image: maven:3.6.3-jdk-11
     ports:
-    - "18123:8123"
+      - "18123:8123"
   clickhouse:
     image: yandex/clickhouse-server

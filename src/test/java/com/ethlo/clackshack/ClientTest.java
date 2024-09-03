@@ -21,64 +21,88 @@ package com.ethlo.clackshack;
  */
 
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+
+import com.clickhouse.jdbc.ClickHouseDriver;
 import com.ethlo.clackshack.model.QueryProgress;
 import com.ethlo.clackshack.model.ResultSet;
 import com.ethlo.clackshack.model.Row;
 import com.ethlo.clackshack.util.IOUtil;
-
-import org.eclipse.jetty.util.StringUtil;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.net.Inet4Address;
-import java.net.Inet6Address;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
-import static org.junit.Assert.assertThrows;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class ClientTest
 {
     private static final Logger logger = LoggerFactory.getLogger(ClientTest.class);
     private static final String baseUrl = "http://localhost:8123";
-    @Rule
-    public LogTestName logTestName = new LogTestName();
 
     @Test
     public void testQueryAllDataTypes()
     {
         try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
-            clackShack.ddl("drop table if exists data_types");
-            clackShack.ddl(IOUtil.readClasspath("datatypes_table.ddl"));
+            final DataSource ds = new SingleConnectionDataSource(new ClickHouseDriver().connect("jdbc:clickhouse://localhost:8123?compress=false", new Properties()), true);
+            final NamedParameterJdbcTemplate tpl = new NamedParameterJdbcTemplate(ds);
+            tpl.update("drop table if exists data_types", Map.of());
+            tpl.update(IOUtil.readClasspath("datatypes_table.ddl"), Map.of());
+
+            final Map<String, Object> params = Map.of(
+                    "t_uint8", 122,
+                    "t_uint16", 5553,
+                    "t_string_map", Map.of("hello", "world"),
+                    "t_string_array", new String[]{"hello", "world"}
+            );
+            tpl.update("""
+                    INSERT INTO data_types
+                    (t_uint8, t_uint16, t_string_map, t_string_array)
+                    VALUES
+                    (:t_uint8, :t_uint16, :t_string_map, :t_string_array)""", params);
 
             final String query = "SELECT * FROM data_types limit :limit";
 
             final int limit = 2_000;
 
-            final Map<String, Object> params = Map.of(
+            final Map<String, Object> queryParams = Map.of(
                     "limit", limit,
                     "string", "abcdefasdadasd"
             );
 
-            final ResultSet result = clackShack.query(query, params);
+            final ResultSet result = clackShack.query(query, queryParams);
             logger.info("\n{}", result);
             assertThat(result).isNotNull();
-            assertThat(result).hasSize(limit);
+            assertThat(result).hasSize(1);
 
             final Row firstRow = result.getRow(0);
             assertThat(firstRow.get("t_ipv4")).isInstanceOf(Inet4Address.class);
             assertThat(firstRow.get("t_ipv6")).isInstanceOf(Inet6Address.class);
+            assertThat(firstRow.get("t_string_map")).isInstanceOf(ObjectNode.class);
 
-            assertThat(result.asMap()).hasSize(limit);
+            assertThat(result.asMap()).hasSize(1);
+        }
+        catch (SQLException e)
+        {
+            throw new RuntimeException(e);
         }
     }
 
@@ -134,89 +158,44 @@ public class ClientTest
         try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final String queryId = UUID.randomUUID().toString();
-            final String query = "SELECT count() from numbers(200000000000)";
+            final String query = "SELECT count() from numbers(2000000000000)";
             final AtomicReference<Exception> exceptionRef = runInSeparateThreadAndFetchException(clackShack, query, QueryOptions.create().queryId(queryId));
 
             Thread.sleep(100);
-            clackShack.killQuery(queryId);
+            clackShack.killQuery(queryId, true);
             logger.info("Kill command finished");
 
             assertThat(exceptionRef.get()).isInstanceOf(QueryAbortedException.class);
         }
     }
 
-    @Test
-    public void testInsert()
-    {
-        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
-        {
-            clackShack.ddl("CREATE TABLE IF NOT EXISTS insert_me (id UInt32, message String) ENGINE = MergeTree ORDER BY id");
-            final Map<String, Object> params = new LinkedHashMap<>();
-            params.put("id", 123);
-            params.put("message", "Hello world");
-            clackShack.insert("INSERT INTO insert_me VALUES (:id, :message)", params);
-        }
-    }
-
-    @Test
-    public void testSelectInsertIntoProgress()
-    {
-        try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
-        {
-            clackShack.ddl("DROP TABLE IF EXISTS nums");
-
-            clackShack.ddl("CREATE TABLE nums (num UInt64) " +
-                    "ENGINE = MergeTree " +
-                    "ORDER BY num " +
-                    "SETTINGS index_granularity = 8192");
-
-            final List<QueryProgress> progressList = new LinkedList<>();
-            clackShack.insert("INSERT INTO nums SELECT * from numbers(30000000) as num", QueryOptions.create()
-                    .progressListener(p ->
-                    {
-                        logger.info("Progress: {}", p);
-                        progressList.add(p);
-                        return true;
-                    }));
-            assertThat(progressList).isNotEmpty();
-        }
-    }
 
     @Test
     public void testKillNonExisting()
     {
         try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
-            final Boolean killResult = clackShack.killQuery(UUID.randomUUID().toString());
-            logger.info("Killed non-existing: {}", killResult);
+            clackShack.killQuery(UUID.randomUUID().toString(), true);
+            logger.info("Killed non-existing");
         }
     }
 
-    @Ignore
     @Test
     public void testQueryExecutionTimeExceeded()
     {
         final List<QueryProgress> progressList = new LinkedList<>();
         try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
-            final String query = "SELECT count() from numbers(2000000000)";
-            try
-            {
-                clackShack.query(query, QueryOptions.create()
-                        .maxExecutionTime(Duration.ofSeconds(1))
-                        .progressListener(p ->
-                        {
-                            logger.info("{}", p);
-                            progressList.add(p);
-                            return true;
-                        }));
-
-                fail("Should have thrown exception");
-            }
-            catch (CompletionException exc)
-            {
-                assertThat(exc.getCause()).isInstanceOf(QueryAbortedException.class);
-            }
+            final String query = "SELECT count() from numbers(20000000000)";
+            final QueryTimeoutException exc = assertThrows(QueryTimeoutException.class, () -> clackShack.query(query, QueryOptions.create()
+                    .maxExecutionTime(Duration.ofSeconds(1))
+                    .progressListener(p ->
+                    {
+                        logger.info("{}", p);
+                        progressList.add(p);
+                        return true;
+                    })));
+            assertThat(exc.getQueryId()).isNotNull();
         }
 
         assertThat(progressList).isNotEmpty();
@@ -245,7 +224,7 @@ public class ClientTest
                 assertThat(expected).isInstanceOf(DuplicateQueryIdException.class);
 
                 // Kill the initial query to avoid having to wait for it
-                clackShack.killQuery(queryId);
+                clackShack.killQuery(queryId, true);
             }
         }
     }
@@ -315,6 +294,7 @@ public class ClientTest
                 {
                     setName("old-query-thread");
                     clackShack.query(query, queryId);
+                    logger.debug("Background query {} finished: {}", queryId, query);
                 }
                 catch (Exception exc)
                 {

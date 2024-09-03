@@ -25,30 +25,65 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import com.ethlo.clackshack.model.ResultSet;
+import com.ethlo.clackshack.util.JsonUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 public class TypeConverterTest
 {
     @Test
-    public void testInputTypes()
+    void testDateParsing()
     {
-        verify(new ExpectedFormat("Date", "2010-01-31", true, LocalDate.parse("2010-01-31")));
-        verify(new ExpectedFormat("Date", "2010-01-32", false, null));
+        verify(new ExpectedFormat("Date", new TextNode("2010-01-31"), LocalDate.parse("2010-01-31")));
+    }
 
-        verify(new ExpectedFormat("DateTime", "2010-01-31 02:03:04", true, LocalDateTime.parse("2010-01-31T02:03:04")));
+    @Test
+    void testDateParsingInvalid()
+    {
+        verify(new ExpectedFormat("Date", new TextNode("2010-01-32"), null));
+    }
 
-        /*chTypes.add("Array", "[]");
-        chTypes.add("Date", "2010-01-31");
-        chTypes.add("DateTime", "2010-01-31 00:10:20");
-        chTypes.add("DateTime64", "");
-        "Decimal", "Decimal128", "Decimal32",
-                "Decimal64", "Enum", "Enum16", "Enum8", "FixedString", "Float32", "Float64", "IPv4", "IPv6", "Int16", "Int32",
-                "Int64", "Int8", "IntervalDay", "IntervalHour", "IntervalMinute", "IntervalMonth", "IntervalQuarter", "IntervalSecond",
-                "IntervalWeek", "IntervalYear", "LowCardinality", "Nested", "Nothing", "Nullable", "SimpleAggregateFunction", "String",
-                "Tuple", "UInt16", "UInt32", "UInt64", "UInt8", "UUID"
-        );*/
+    @Test
+    void testDateTimeParsing()
+    {
+        verify(new ExpectedFormat("DateTime", new TextNode("2010-01-31 02:03:04"), LocalDateTime.parse("2010-01-31T02:03:04")));
+    }
+
+    @Test
+    void testLowCardinalityNullableStringParsing()
+    {
+        verify(new ExpectedFormat("LowCardinality(Nullable(String))", new TextNode("urn:foo:bar"), "urn:foo:bar"));
+    }
+
+    @Test
+    void testNullableStringParsing()
+    {
+        verify(new ExpectedFormat("Nullable(String))", new TextNode("urn:foo:bar"), "urn:foo:bar"));
+    }
+
+    @Test
+    void testEnum8Parsing()
+    {
+        verify(new ExpectedFormat("Enum8('OBSERVE' = 1, 'ADD' = 2, 'DELETE' = 3)", new TextNode("OBSERVE"), "OBSERVE"));
+    }
+
+    @Test
+    void testArrayLowCardinalityNullableStringParsing()
+    {
+        final JsonNode input = JsonUtil.readTree("""
+                ["Hello", "World!"]""");
+        verify(new ExpectedFormat("Array(LowCardinality(Nullable(String)))", input, input));
+    }
+
+    @Test
+    void testMapLowCardinalityStringParsing()
+    {
+        final JsonNode input = JsonUtil.readTree("""
+                {"Hello": "Verb", "World!": "Subject"}""");
+        verify(new ExpectedFormat("Map(LowCardinality(String), String)", input, input));
     }
 
     private void verify(final ExpectedFormat format)
@@ -59,26 +94,14 @@ public class TypeConverterTest
         }
         catch (TypeConversionException exc)
         {
-            if (format.expectedOk)
+            if (format.expected != null)
             {
                 throw exc;
             }
         }
     }
 
-    private static class ExpectedFormat
+    private record ExpectedFormat(String type, JsonNode input, Object expected)
     {
-        private final String type;
-        private final String input;
-        private final boolean expectedOk;
-        private final Object expected;
-
-        private ExpectedFormat(final String type, final String input, final boolean expectedOk, final Object expected)
-        {
-            this.type = type;
-            this.input = input;
-            this.expectedOk = expectedOk;
-            this.expected = expected;
-        }
     }
 }

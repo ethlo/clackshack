@@ -29,6 +29,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class QueryProgress
 {
+    public static final QueryProgress ZERO = new QueryProgress(0, 0, 0);
     final private long readRows;
     final private long readBytes;
     final private long totalRowsToRead;

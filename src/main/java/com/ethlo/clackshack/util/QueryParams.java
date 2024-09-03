@@ -74,6 +74,7 @@ public class QueryParams
         {
             return QueryParam.of(name, (LocalDateTime) value);
         }
+
         return QueryParam.of(name, value.toString());
     }
 

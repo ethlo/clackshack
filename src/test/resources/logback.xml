@@ -31,4 +31,6 @@
     <root level="info">
         <appender-ref ref="stdout"/>
     </root>
+
+    <logger name="com.ethlo.clackshack" level="DEBUG"/>
 </configuration>
