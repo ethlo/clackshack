@@ -9,7 +9,7 @@
     <name>ClackShack</name>
     <url>https://github.com/ethlo/clackshack</url>
     <description>Unofficial ClickHouse HTTP query interface client</description>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>4.0.0</version>
     <dependencyManagement>
         <dependencies>
             <dependency>
