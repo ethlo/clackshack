@@ -25,6 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.ethlo.clackshack.model.DataTypes;
+
+import com.fasterxml.jackson.databind.node.NullNode;
+
 import org.junit.jupiter.api.Test;
 
 import com.ethlo.clackshack.model.ResultSet;
@@ -68,6 +72,13 @@ public class TypeConverterTest
     void testEnum8Parsing()
     {
         verify(new ExpectedFormat("Enum8('OBSERVE' = 1, 'ADD' = 2, 'DELETE' = 3)", new TextNode("OBSERVE"), "OBSERVE"));
+    }
+
+    @Test
+    void testNullValueParsing()
+    {
+        assertThat(ResultSet.convertType(DataTypes.INT_32.getName(), null)).isNull();
+        assertThat(ResultSet.convertType(DataTypes.INT_32.getName(), NullNode.getInstance())).isNull();
     }
 
     @Test

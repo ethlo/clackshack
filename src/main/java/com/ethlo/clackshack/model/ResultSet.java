@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ethlo.clackshack.TypeConversionException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 
 public class ResultSet implements Iterable<Row>
 {
@@ -62,7 +63,7 @@ public class ResultSet implements Iterable<Row>
 
     public static Object convertType(final String chType, final JsonNode value)
     {
-        if (value == null)
+        if (value == null || value instanceof NullNode)
         {
             return null;
         }
