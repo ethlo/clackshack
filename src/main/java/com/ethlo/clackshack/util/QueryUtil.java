@@ -30,7 +30,7 @@ import com.ethlo.clackshack.model.QueryParam;
 
 public class QueryUtil
 {
-    private static final Pattern PATTERN = Pattern.compile(":(\\w+)");
+    private static final Pattern PATTERN = Pattern.compile("(?:'[^']*'|\"[^\"]*\")|(?<!['\"]):\\w+");
 
     public static String format(String format, List<QueryParam> values)
     {
@@ -38,21 +38,28 @@ public class QueryUtil
         final List<Object> valueList = new ArrayList<>();
         final Matcher matcher = PATTERN.matcher(format);
 
+        final StringBuffer result = new StringBuffer();
         while (matcher.find())
         {
-            final String key = matcher.group(1);
-            final String formatKey = String.format(":%s", key);
-            final int index = formatter.indexOf(formatKey);
-
-            if (index != -1)
+            final String match = matcher.group();
+            if (match.startsWith(":"))
             {
-                formatter.replace(index, index + formatKey.length(), "%s");
+                // Replace the placeholder with a dynamic value
+                final String key = match.substring(1);
                 final QueryParam param = getValue(key, values);
-                valueList.add(String.format("{%s:%s}", param.getName(), param.getType()));
+                String replacement = String.format("{%s:%s}", param.getName(), param.getType());
+                matcher.appendReplacement(result, replacement);
+            }
+            else
+            {
+                // Keep quoted parts unchanged
+                matcher.appendReplacement(result, Matcher.quoteReplacement(match));
             }
         }
 
-        return String.format(formatter.toString(), valueList.toArray());
+        matcher.appendTail(result);
+
+        return result.toString();
     }
 
     private static QueryParam getValue(final String key, final List<QueryParam> values)
