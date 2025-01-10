@@ -108,4 +108,9 @@ public interface ClackShack extends AutoCloseable
     {
         return query(query, QueryOptions.DEFAULT);
     }
+
+    default ResultSet query(String query, List<QueryParam> params)
+    {
+        return query(query, params, QueryOptions.DEFAULT);
+    }
 }

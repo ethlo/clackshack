@@ -104,9 +104,19 @@ public class QueryParam
         return new QueryParam(name, "Map(%s, %s)".formatted(keyType, valueType), JsonUtil.string(map));
     }
 
+    public static <K, V> QueryParam of(String name, Map<K, V> map, DataTypes.DataType<?> keyType, DataTypes.DataType<?> valueType)
+    {
+        return new QueryParam(name, "Map(%s, %s)".formatted(keyType.name, valueType.name), JsonUtil.string(map));
+    }
+
     public static <V> QueryParam of(String name, List<V> array, String valueType)
     {
         return new QueryParam(name, "Array(%s)".formatted(valueType), JsonUtil.string(array));
+    }
+
+    public static <V> QueryParam of(String name, List<V> array, DataTypes.DataType<?> valueType)
+    {
+        return new QueryParam(name, "Array(%s)".formatted(valueType.name), JsonUtil.string(array));
     }
 
     public String getName()
