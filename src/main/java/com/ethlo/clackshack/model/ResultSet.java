@@ -29,6 +29,7 @@ import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -170,7 +171,7 @@ public class ResultSet implements Iterable<Row>
                 '}';
     }
 
-    private int size()
+    public int size()
     {
         return data.size();
     }
@@ -197,5 +198,10 @@ public class ResultSet implements Iterable<Row>
     public boolean isEmpty()
     {
         return data.isEmpty();
+    }
+
+    public Stream<Row> stream()
+    {
+        return data.stream();
     }
 }

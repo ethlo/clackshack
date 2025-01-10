@@ -90,7 +90,6 @@ public class ClientTest
 
             final ResultSet result = clackShack.query(query, queryParams);
             logger.info("\n{}", result);
-            assertThat(result).isNotNull();
             assertThat(result).hasSize(1);
 
             final Row firstRow = result.getRow(0);
