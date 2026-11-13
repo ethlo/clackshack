@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigInteger;
 import java.net.InetAddress;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -91,6 +92,8 @@ public class QueryTest
             final Map<String, Object> floats = Map.of("f", List.of(0.1f, 1.0d));
             assertThat(count(clackShack, "SELECT count() AS c FROM numbers(1) WHERE toFloat64(toFloat32(0.1)) IN (:f)", floats)).isEqualTo(1);
             final List<QueryParam> ips = List.of(QueryParam.of("ips", List.of(InetAddress.getLoopbackAddress()), DataTypes.IP_V4));
+            final List<QueryParam> times = List.of(QueryParam.of("t", List.of(LocalDateTime.parse("2026-01-02T03:04:05.123")), "DateTime64(3)"));
+            assertThat(clackShack.query("SELECT has(:t, toDateTime64('2026-01-02 03:04:05.123', 3)) AS c", times).getRow(0).get("c", Short.class)).isEqualTo((short) 1);
             assertThat(clackShack.query("SELECT has(:ips, toIPv4('127.0.0.1')) AS c", ips).getRow(0).get("c", Short.class)).isEqualTo((short) 1);
         }
     }

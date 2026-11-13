@@ -90,7 +90,8 @@ public class ParamValueFormatter
         }
         else if (value instanceof LocalDateTime dateTime)
         {
-            appendQuoted(sb, DATE_TIME_FORMAT.format(dateTime));
+            // Keeps fractional seconds when present, for DateTime64 elements
+            appendQuoted(sb, DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime));
         }
         else if (value instanceof InetAddress address)
         {

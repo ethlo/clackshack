@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.net.InetAddress;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -122,5 +123,12 @@ public class QueryParamsTest
     {
         final InetAddress address = InetAddress.getByAddress("localhost", new byte[]{127, 0, 0, 1});
         assertThat(QueryParam.of("ips", List.of(address), DataTypes.IP_V4).getValue()).isEqualTo("['127.0.0.1']");
+    }
+
+    @Test
+    void dateTimeKeepsFractionalSecondsOnlyWhenPresent()
+    {
+        final List<LocalDateTime> times = List.of(LocalDateTime.parse("2026-01-02T03:04:05.123"), LocalDateTime.parse("2026-01-02T03:04:00"));
+        assertThat(QueryParam.of("t", times, "DateTime64(3)").getValue()).isEqualTo("['2026-01-02T03:04:05.123','2026-01-02T03:04:00']");
     }
 }
