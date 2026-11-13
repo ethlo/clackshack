@@ -100,6 +100,8 @@ public class QueryParamsTest
         final QueryParam param = QueryParams.of("a", List.of(List.of("x"), List.of("y", "z")));
         assertThat(param.getType()).isEqualTo("Array(Array(String))");
         assertThat(param.getValue()).isEqualTo("[['x'],['y','z']]");
+        assertThat(QueryParams.of("a", List.of(List.of(1), List.of(2L))).getType()).isEqualTo("Array(Array(Int64))");
+        assertThat(QueryParams.of("a", List.of(List.of(), List.of("x"))).getType()).isEqualTo("Array(Array(String))");
     }
 
     @Test

@@ -111,9 +111,17 @@ public class QueryParams
 
     private static String widen(final String name, final String a, final String b)
     {
-        if (a.equals(b))
+        if (a.equals(b) || b.equals("Nothing"))
         {
             return a;
+        }
+        if (a.equals("Nothing"))
+        {
+            return b;
+        }
+        if (a.startsWith("Array(") && b.startsWith("Array("))
+        {
+            return "Array(%s)".formatted(widen(name, a.substring(6, a.length() - 1), b.substring(6, b.length() - 1)));
         }
 
         final int intA = INTEGER_TYPES.indexOf(a);
