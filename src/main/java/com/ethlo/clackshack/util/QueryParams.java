@@ -25,16 +25,27 @@ import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.ethlo.clackshack.model.QueryParam;
 
 public class QueryParams
 {
+    private static final List<String> INTEGER_TYPES = List.of("Int8", "Int16", "Int32", "Int64");
+    private static final List<String> FLOAT_TYPES = List.of("Float32", "Float64");
+    private static final Set<Class<?>> NUMBER_TYPES = Set.of(Byte.class, Short.class, Integer.class, Long.class, Float.class, Double.class);
+
     public static QueryParam of(String name, Object value)
     {
         if (value == null)
         {
             throw new IllegalArgumentException("Cannot handle null as it is impossible to infer the data type for parameter '" + name + "'");
+        }
+
+        if (ParamValueFormatter.isArrayLike(value))
+        {
+            final List<Object> elements = ParamValueFormatter.asList(value);
+            return new QueryParam(name, "Array(%s)".formatted(elementType(name, elements)), ParamValueFormatter.format(elements));
         }
 
         final Class<?> type = value.getClass();
@@ -76,6 +87,48 @@ public class QueryParams
         }
 
         return QueryParam.of(name, value.toString());
+    }
+
+    private static String elementType(final String name, final List<Object> elements)
+    {
+        String type = null;
+        for (final Object element : elements)
+        {
+            if (element == null)
+            {
+                throw new IllegalArgumentException("Cannot handle null elements in array parameter '" + name + "'");
+            }
+            if (element instanceof Number && !NUMBER_TYPES.contains(element.getClass()))
+            {
+                throw new IllegalArgumentException("Cannot infer the data type of " + element.getClass().getSimpleName() + " elements in array parameter '" + name + "', use QueryParam.of(name, list, type)");
+            }
+            final String elementType = of(name, element).getType();
+            type = type == null ? elementType : widen(name, type, elementType);
+        }
+        // An empty array has no element type to infer; Nothing is ClickHouse's type of an empty array literal
+        return type != null ? type : "Nothing";
+    }
+
+    private static String widen(final String name, final String a, final String b)
+    {
+        if (a.equals(b))
+        {
+            return a;
+        }
+
+        final int intA = INTEGER_TYPES.indexOf(a);
+        final int intB = INTEGER_TYPES.indexOf(b);
+        if (intA >= 0 && intB >= 0)
+        {
+            return INTEGER_TYPES.get(Math.max(intA, intB));
+        }
+
+        if ((intA >= 0 || FLOAT_TYPES.contains(a)) && (intB >= 0 || FLOAT_TYPES.contains(b)))
+        {
+            return "Float64";
+        }
+
+        throw new IllegalArgumentException("Cannot mix element types " + a + " and " + b + " in array parameter '" + name + "'");
     }
 
     public static List<QueryParam> asList(final Map<String, Object> params)

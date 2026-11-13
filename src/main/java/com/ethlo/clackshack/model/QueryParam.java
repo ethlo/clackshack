@@ -22,12 +22,11 @@ package com.ethlo.clackshack.model;
 
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import com.ethlo.clackshack.util.JsonUtil;
+import com.ethlo.clackshack.util.ParamValueFormatter;
 
 public class QueryParam
 {
@@ -91,7 +90,7 @@ public class QueryParam
 
     public static QueryParam of(final String name, final LocalDateTime dateTime)
     {
-        return new QueryParam(name, "String", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss").format(dateTime));
+        return new QueryParam(name, "String", ParamValueFormatter.DATE_TIME_FORMAT.format(dateTime));
     }
 
     public static QueryParam ofNull(String name, String type)
@@ -101,22 +100,22 @@ public class QueryParam
 
     public static <K, V> QueryParam of(String name, Map<K, V> map, String keyType, String valueType)
     {
-        return new QueryParam(name, "Map(%s, %s)".formatted(keyType, valueType), JsonUtil.string(map));
+        return new QueryParam(name, "Map(%s, %s)".formatted(keyType, valueType), ParamValueFormatter.format(map));
     }
 
     public static <K, V> QueryParam of(String name, Map<K, V> map, DataTypes.DataType<?> keyType, DataTypes.DataType<?> valueType)
     {
-        return new QueryParam(name, "Map(%s, %s)".formatted(keyType.name, valueType.name), JsonUtil.string(map));
+        return new QueryParam(name, "Map(%s, %s)".formatted(keyType.name, valueType.name), ParamValueFormatter.format(map));
     }
 
     public static <V> QueryParam of(String name, List<V> array, String valueType)
     {
-        return new QueryParam(name, "Array(%s)".formatted(valueType), JsonUtil.string(array));
+        return new QueryParam(name, "Array(%s)".formatted(valueType), ParamValueFormatter.format(array));
     }
 
     public static <V> QueryParam of(String name, List<V> array, DataTypes.DataType<?> valueType)
     {
-        return new QueryParam(name, "Array(%s)".formatted(valueType.name), JsonUtil.string(array));
+        return new QueryParam(name, "Array(%s)".formatted(valueType.name), ParamValueFormatter.format(array));
     }
 
     public String getName()

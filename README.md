@@ -10,3 +10,16 @@ Unofficial ClickHouse HTTP query interface client.
 
 * Easy to use
 * Support query progress updates via listener interface.
+
+## Query parameters
+
+Use `:name` placeholders and pass the values as a `Map<String, Object>` or a list of `QueryParam`.
+A `Collection` or array value becomes an `Array(T)` parameter, with `T` inferred from the elements, so it can be used with `IN` and `NOT IN`:
+
+```java
+clackShack.query("SELECT * FROM events WHERE product_id NOT IN (:ids)", Map.of("ids", List.of("milk", "flour")));
+```
+
+* Mixed integer and float elements are widened (e.g. `Int32` and `Int64` give `Int64`); other mixes and `null` elements are rejected.
+* An empty collection becomes `Array(Nothing)`: `IN` matches nothing and `NOT IN` matches everything.
+* For element types that cannot be inferred (e.g. `BigDecimal`, `UInt64`), use `QueryParam.of(name, list, type)`.
