@@ -21,6 +21,7 @@ package com.ethlo.clackshack.util;
  */
 
 import java.lang.reflect.Array;
+import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -78,6 +79,11 @@ public class ParamValueFormatter
         {
             sb.append(b ? '1' : '0');
         }
+        else if (value instanceof Float f)
+        {
+            // Matches the value a Float has once widened to Float64, and still parses back to the same Float32
+            sb.append(f.doubleValue());
+        }
         else if (value instanceof Number)
         {
             sb.append(value);
@@ -85,6 +91,10 @@ public class ParamValueFormatter
         else if (value instanceof LocalDateTime dateTime)
         {
             appendQuoted(sb, DATE_TIME_FORMAT.format(dateTime));
+        }
+        else if (value instanceof InetAddress address)
+        {
+            appendQuoted(sb, address.getHostAddress());
         }
         else if (isArrayLike(value))
         {
