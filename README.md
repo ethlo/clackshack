@@ -20,6 +20,7 @@ A `Collection` or array value becomes an `Array(T)` parameter, with `T` inferred
 clackShack.query("SELECT * FROM events WHERE product_id NOT IN (:ids)", Map.of("ids", List.of("milk", "flour")));
 ```
 
-* Mixed integer and float elements are widened (e.g. `Int32` and `Int64` give `Int64`); other mixes and `null` elements are rejected.
+* Mixed number elements are widened (e.g. `Int32` and `Int64` give `Int64`, `Int32` and `Float64` give `Float64`); `Int64` with a float, other mixes and `null` elements are rejected.
 * An empty collection becomes `Array(Nothing)`: `IN` matches nothing and `NOT IN` matches everything.
-* For element types that cannot be inferred (e.g. `BigDecimal`, `UInt64`), use `QueryParam.of(name, list, type)`.
+* For element types that cannot be inferred (e.g. `BigDecimal`, `UInt64`, maps), use `QueryParam.of(name, list, type)`.
+* Parameters are sent in the URL, so very large lists can exceed ClickHouse's `http_max_uri_size` (1 MiB by default).

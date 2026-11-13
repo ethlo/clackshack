@@ -108,5 +108,7 @@ public class QueryParamsTest
         assertThatThrownBy(() -> QueryParams.of("a", Arrays.asList("x", null))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("null");
         assertThatThrownBy(() -> QueryParams.of("a", List.of("x", 1))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("String and Int32");
         assertThatThrownBy(() -> QueryParams.of("a", List.of(BigDecimal.ONE))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("BigDecimal");
+        assertThatThrownBy(() -> QueryParams.of("a", List.of(Map.of("k", 1)))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Map");
+        assertThatThrownBy(() -> QueryParams.of("a", List.of(1L, 1.5))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Int64 and Float64");
     }
 }

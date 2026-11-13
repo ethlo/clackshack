@@ -60,6 +60,7 @@ public class QueryTest
             final Map<String, Object> params = Map.of("ids", List.of(4, 12, 989L), "names", List.of("4", "12", "it's \\ \t"));
             assertThat(count(clackShack, query.formatted("IN", "IN"), params)).isEqualTo(2);
             assertThat(count(clackShack, query.formatted("NOT IN", "NOT IN"), params)).isEqualTo(1997);
+            assertThat(count(clackShack, "SELECT has(:names, 'it\\'s \\\\ \\t') AS c", params)).isEqualTo(1);
         }
     }
 
@@ -90,6 +91,6 @@ public class QueryTest
 
     private static long count(final ClackShack clackShack, final String query, final Map<String, Object> params)
     {
-        return clackShack.query(query, params).getRow(0).get("c", BigInteger.class).longValue();
+        return ((Number) clackShack.query(query, params).getRow(0).get("c")).longValue();
     }
 }

@@ -98,7 +98,7 @@ public class QueryParams
             {
                 throw new IllegalArgumentException("Cannot handle null elements in array parameter '" + name + "'");
             }
-            if (element instanceof Number && !NUMBER_TYPES.contains(element.getClass()))
+            if ((element instanceof Number && !NUMBER_TYPES.contains(element.getClass())) || element instanceof Map<?, ?>)
             {
                 throw new IllegalArgumentException("Cannot infer the data type of " + element.getClass().getSimpleName() + " elements in array parameter '" + name + "', use QueryParam.of(name, list, type)");
             }
@@ -123,7 +123,10 @@ public class QueryParams
             return INTEGER_TYPES.get(Math.max(intA, intB));
         }
 
-        if ((intA >= 0 || FLOAT_TYPES.contains(a)) && (intB >= 0 || FLOAT_TYPES.contains(b)))
+        // Int64 does not fit in Float64 without losing precision
+        final boolean floatA = FLOAT_TYPES.contains(a) || (intA >= 0 && !a.equals("Int64"));
+        final boolean floatB = FLOAT_TYPES.contains(b) || (intB >= 0 && !b.equals("Int64"));
+        if (floatA && floatB)
         {
             return "Float64";
         }
