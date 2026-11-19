@@ -131,7 +131,8 @@ public class ClientTest
         try (final ClackShack clackShack = new ClackShackImpl(baseUrl))
         {
             final AtomicInteger counter = new AtomicInteger();
-            final String query = "SELECT count() from numbers(2000000000)";
+            // Large enough that the query is still running at the third progress update, which aborts it
+            final String query = "SELECT count() from numbers(2000000000000)";
 
             assertThrows(QueryAbortedException.class, () ->
             {
