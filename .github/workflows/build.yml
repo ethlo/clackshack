@@ -11,6 +11,19 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-26.04
+    services:
+      # The tests talk to a ClickHouse server on localhost:8123 as the default user without a password
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.8
+        env:
+          CLICKHOUSE_SKIP_USER_SETUP: 1
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "wget -qO- http://localhost:8123/ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     strategy:
       fail-fast: false
       matrix:
